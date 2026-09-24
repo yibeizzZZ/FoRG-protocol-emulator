@@ -11,3 +11,10 @@ test/sim_build
 test/__pycache__/
 test/results.xml
 test/gate_level_netlist.v
+
+# Local Python environments and generated test output
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+/test/output/

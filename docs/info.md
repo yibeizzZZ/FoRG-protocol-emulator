@@ -9,12 +9,21 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+This project is a programmable general-purpose protocol emulator ASIC for the Jane Street Protocol Emulator ASIC Competition.
+
+The current Week 1 implementation is an infrastructure placeholder used to verify the Tiny Tapeout CMOS5L simulation, CI, synthesis, and physical-design flow. The final design will replace the placeholder logic with a programmable protocol execution engine capable of implementing multiple digital protocols in firmware.
+
+Initial target protocols include UART, SPI, and I2C.
 
 ## How to test
 
-Explain how to use your project
+Run the RTL simulation from the `test` directory:
+
+```bash
+make clean
+make
+```
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+No external hardware is required for the current Week 1 simulation and CI setup.

@@ -18,8 +18,8 @@ Goal: establish a reproducible development environment immediately.
 
 Tasks:
 
-* Initialize the repository from the Tiny Tapeout IHP Verilog template
-* Verify RTL simulation locally
+* ✅Initialize the repository from the Tiny Tapeout IHP Verilog template
+* ✅Verify RTL simulation locally
 * Verify CI through GitHub Actions
 * Verify synthesis completes successfully
 * Configure the target Tiny Tapeout tile allocation
