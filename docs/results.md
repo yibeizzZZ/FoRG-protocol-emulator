@@ -76,7 +76,7 @@ M1 UART build: [run 36896008643](https://github.com/yibeizzZZ/FoRG-protocol-emul
 
 M2 core build: [run 36896558569](https://github.com/yibeizzZZ/FoRG-protocol-emulator/actions/runs/36896558569), revision add393e.
 
-- GDS build and all five post-route gate tests passed (also reproduced on macOS). Physical precheck is still running.
+- GDS build and all five post-route gate tests passed (also reproduced on macOS). All nine physical prechecks passed.
 - Post-route standard-cell area: 73,581.2 um²; 3,895 standard-cell instances.
 - Clock constraint: 20 ns (50 MHz).
 - Worst setup slack: 7.1685 ns; worst hold slack: 0.1235 ns.
