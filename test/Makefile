@@ -7,7 +7,11 @@ FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
-TARGET ?= legacy
+TARGET ?= core
+ifeq ($(TARGET),core)
+PROJECT_SOURCES = protocol_engine.v protocol_top.v
+COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
+endif
 ifeq ($(TARGET),uart)
 PROJECT_SOURCES = uart_tx.v uart_baseline.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_uart_baseline
@@ -50,6 +54,9 @@ TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
 COCOTB_TEST_MODULES = test
+ifeq ($(TARGET),core)
+COCOTB_TEST_MODULES = test_core
+endif
 ifeq ($(TARGET),uart)
 COCOTB_TEST_MODULES = test_uart
 endif

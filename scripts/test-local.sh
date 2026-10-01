@@ -20,5 +20,6 @@ cases = list(root.iter("testcase"))
 failures = list(root.iter("failure")) + list(root.iter("error"))
 if not cases or failures:
     raise SystemExit("Simulation failed or no test cases were reported")
-print(f"Verified results.xml: {len(cases)} test(s), no failures/errors")
+skipped = len(list(root.iter("skipped")))
+print(f"Verified results.xml: {len(cases) - skipped} passed, {skipped} skipped, no failures/errors")
 PY

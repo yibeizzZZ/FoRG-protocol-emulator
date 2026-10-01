@@ -28,6 +28,7 @@ jobs:
           cd test
           make clean
           make
+          cp results.xml results-core.xml
           # make will return success even if the test fails, so check for failure in the results.xml
           ! grep failure results.xml
 
@@ -36,12 +37,19 @@ jobs:
           cd test
           for divisor in 1 2 4 17 434; do
             make -B TARGET=uart UART_CLKS_PER_BIT=$divisor
+            cp results.xml results-uart-$divisor.xml
           done
+
+      - name: Preserve the original engine regression
+        run: |
+          cd test
+          make -B TARGET=legacy
+          cp results.xml results-legacy.xml
 
       - name: Test Summary
         uses: test-summary/action@v2.4
         with:
-          paths: "test/results.xml"
+          paths: "test/results-*.xml"
         if: always()
 
       - name: upload waveform and test results
@@ -52,4 +60,5 @@ jobs:
           path: |
             test/tb.fst
             test/results.xml
+            test/results-*.xml
             test/output/*
