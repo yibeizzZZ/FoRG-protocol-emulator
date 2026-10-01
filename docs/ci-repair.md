@@ -39,9 +39,10 @@ were 1.0 um wide; the CMOS5L precheck requires at least 2.1 um.
 The resolved build configuration used `PDN_VWIDTH: 1`.
 `src/config.json` now sets `PDN_VWIDTH: 2.1`.
 
-This configuration fix is pending a fresh GDS build and precheck. Do not
-edit generated LEF/GDS files or weaken the checker. Widening power straps
-can affect routing, so the full build must pass before calling this fixed.
+Validated in run 36895697829: fresh GDS, gate regression and all nine
+prechecks passed. Generated VGND/VPWR straps are 2.100 um wide and setup/hold
+violation counts are zero. Generated LEF/GDS files were not edited and the
+checker was not weakened. See docs/results.md for the measured evidence.
 
 ## GitHub Pages
 
@@ -52,7 +53,7 @@ https://github.com/yibeizzZZ/FoRG-protocol-emulator/settings/pages
 
 No physical verification job has been disabled or marked continue-on-error.
 
-## Finish validation on GitHub
+## Reproduce validation on GitHub
 
 1. Review and push the local changes on a branch, or apply them through a PR.
 2. Enable GitHub Pages as described above.
@@ -61,5 +62,12 @@ No physical verification job has been disabled or marked continue-on-error.
 4. Require gds, precheck, gl_test, and viewer to pass. Review the new timing
    and physical reports as well as the workflow status.
 
-The authenticated account used for this investigation has read-only access
-to the upstream repository, so no remote changes or workflow reruns were made.
+The initial investigation used a read-only account. The user subsequently
+authorized development-branch pushes using an account with write access.
+CI now runs on codex/m0-m2-development; no changes are pushed to main.
+Viewer publication is limited to the default branch, so a development build
+cannot overwrite the existing site. Pages setup still requires an administrator.
+
+The new M2 core uses program-byte validity tracking and does not require the
+legacy gate-level startup workaround. The legacy RTL test still exercises
+its original startup without the additional reset.

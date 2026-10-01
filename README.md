@@ -44,6 +44,8 @@ Gate simulation uses the matching PDK revision and a zero-delay functional model
 - [ISA and host interface](docs/isa.md)
 - [Fixed UART contract and tests](docs/uart-baseline.md)
 - [CI repair evidence and limitations](docs/ci-repair.md)
+- [Measured verification results](docs/results.md)
+- [Contribution workflow](CONTRIBUTING.md)
 - [Milestone roadmap](MILESTONES.md)
 
 All inputs must be synchronous to the design clock. No cloud FPGA access or external board is needed for local tests.
