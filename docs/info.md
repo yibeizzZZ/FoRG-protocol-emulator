@@ -1,29 +1,23 @@
-<!---
-
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
-
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
-
 ## How it works
 
-This project is a programmable general-purpose protocol emulator ASIC for the Jane Street Protocol Emulator ASIC Competition.
+A minimal programmable I/O engine with 32 16-bit instructions, four 8-bit registers, byte-wide GPIO and direction control, deterministic waits, conditional and unconditional branches, shifts, and debug readback. The clock target is 50 MHz; actual timing must be checked in build reports.
 
-The current Week 1 implementation is an infrastructure placeholder used to verify the Tiny Tapeout CMOS5L simulation, CI, synthesis, and physical-design flow. The final design will replace the placeholder logic with a programmable protocol execution engine capable of implementing multiple digital protocols in firmware.
+UART, SPI and I2C firmware are later milestones. The dedicated M1 UART is an independent baseline, not a block in this design.
 
-Initial target protocols include UART, SPI, and I2C.
+## Host interface
+
+All inputs must be synchronous to clk. rst_n is synchronous active-low reset; reset invalidates the program and requires reloading. ena pauses sequential state. GPIO is released while reset, stopped, halted, or faulted.
+
+With ui_in[7]=0, ui_in[6] enables writing uio_in to program memory. ui_in[4:0] selects a word; ui_in[5] selects its low/high byte. Load both bytes of each instruction before running. Setting ui_in[7]=1 runs from PC 0.
+
+During execution, ui_in[6:5] selects uo_out readback: 00=GPIO data, 01={fault,halted,wait_active,PC[4:0]}, 10=register selected by ui_in[1:0], 11=direction mask. uio_in is GPIO input; uio_out/oe provide output data and enables.
+
+Instruction encoding and cycle semantics are documented in docs/isa.md.
 
 ## How to test
 
-Run the RTL simulation from the `test` directory:
-
-```bash
-make clean
-make
-```
+Run `bash scripts/test-local.sh` from the repository root. The regression uses pin-level readback to compare execution with a Python ISA model, including waits, pause, reset, invalid fetches, reprogramming and PC wrap. The same core tests run on the generated gate netlist.
 
 ## External hardware
 
-No external hardware is required for the current Week 1 simulation and CI setup.
+No external hardware is needed for simulation. Real pin-level and protocol validation remains future work. External devices require suitable electrical interfaces and synchronized inputs; this design is not an I2C PHY.

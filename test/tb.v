@@ -24,7 +24,10 @@ module tb ();
   wire [7:0] uio_oe;
 
   // Replace tt_um_example with your module name:
-  tt_um_forg_protocol_emulator user_project (
+`ifndef PROJECT_TOP
+`define PROJECT_TOP tt_um_forg_protocol_emulator
+`endif
+  `PROJECT_TOP user_project (
       .ui_in  (ui_in),    // Dedicated inputs
       .uo_out (uo_out),   // Dedicated outputs
       .uio_in (uio_in),   // IOs: Input path

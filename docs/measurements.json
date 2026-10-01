@@ -1,0 +1,67 @@
+[
+  {
+    "target": "legacy",
+    "run_url": "https://github.com/yibeizzZZ/FoRG-protocol-emulator/actions/runs/36895697829",
+    "revision": "c835af9",
+    "source_sha256": {
+      "project.v": "c8b1445db181e63fabdb3e7bc7afaa76e15a7fed992f5dab67b2061f610c7eae"
+    },
+    "flow": {
+      "FLOW_NAME": "LibreLane",
+      "FLOW_VERSION": "3.1.0.dev3",
+      "PDK": "ihp-sg13cmos5l",
+      "PDK_SOURCE": "IHP-Open-PDK",
+      "PDK_VERSION": "2bbec755dc67ca3db0261c3d6163e15735d66710"
+    },
+    "clock_period_ns": 20,
+    "standard_cell_area_um2": 9162.72,
+    "worst_setup_slack_ns": 13.162018514301726,
+    "worst_hold_slack_ns": 0.13615903234734794,
+    "setup_violations": 0,
+    "hold_violations": 0
+  },
+  {
+    "target": "uart",
+    "run_url": "https://github.com/yibeizzZZ/FoRG-protocol-emulator/actions/runs/36896008643",
+    "revision": "4f96854",
+    "source_sha256": {
+      "uart_tx.v": "bcb0b3a3fc8c59bf4cf98bfb9713e61c8d28df8bfc5b339d9f42f7e1cc386cb9",
+      "uart_baseline.v": "ba1ad2163c8a13ec7d58929803dc9a012608700a039ff417cf099eeb95166177"
+    },
+    "flow": {
+      "FLOW_NAME": "LibreLane",
+      "FLOW_VERSION": "3.1.0.dev3",
+      "PDK": "ihp-sg13cmos5l",
+      "PDK_SOURCE": "IHP-Open-PDK",
+      "PDK_VERSION": "2bbec755dc67ca3db0261c3d6163e15735d66710"
+    },
+    "clock_period_ns": 20,
+    "standard_cell_area_um2": 3305.84,
+    "worst_setup_slack_ns": 12.946724947455918,
+    "worst_hold_slack_ns": 0.16341423121660795,
+    "setup_violations": 0,
+    "hold_violations": 0
+  },
+  {
+    "target": "core",
+    "run_url": "https://github.com/yibeizzZZ/FoRG-protocol-emulator/actions/runs/36896558569",
+    "revision": "add393e",
+    "source_sha256": {
+      "protocol_engine.v": "3000d2340cc1470049df9daeb0112b01bc50bec2a8d69b7189db3d8fcfd9a659",
+      "protocol_top.v": "b76601cf1d772f4ced8cdffb52ba8517d689e2a5a13759d7fff5ff9ff1b80c14"
+    },
+    "flow": {
+      "FLOW_NAME": "LibreLane",
+      "FLOW_VERSION": "3.1.0.dev3",
+      "PDK": "ihp-sg13cmos5l",
+      "PDK_SOURCE": "IHP-Open-PDK",
+      "PDK_VERSION": "2bbec755dc67ca3db0261c3d6163e15735d66710"
+    },
+    "clock_period_ns": 20,
+    "standard_cell_area_um2": 73581.2,
+    "worst_setup_slack_ns": 7.168491780852182,
+    "worst_hold_slack_ns": 0.1235493964327867,
+    "setup_violations": 0,
+    "hold_violations": 0
+  }
+]
