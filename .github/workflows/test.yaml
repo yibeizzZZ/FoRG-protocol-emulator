@@ -31,6 +31,13 @@ jobs:
           # make will return success even if the test fails, so check for failure in the results.xml
           ! grep failure results.xml
 
+      - name: Check UART timing at multiple divisors
+        run: |
+          cd test
+          for divisor in 1 2 4 17 434; do
+            make -B TARGET=uart UART_CLKS_PER_BIT=$divisor
+          done
+
       - name: Test Summary
         uses: test-summary/action@v2.4
         with:

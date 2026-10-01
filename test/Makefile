@@ -7,17 +7,26 @@ FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
+TARGET ?= legacy
+ifeq ($(TARGET),uart)
+PROJECT_SOURCES = uart_tx.v uart_baseline.v
+COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_uart_baseline
+ifneq ($(UART_CLKS_PER_BIT),)
+COMPILE_ARGS += -DUART_CLKS_PER_BIT=$(UART_CLKS_PER_BIT)
+export UART_CLKS_PER_BIT
+endif
+endif
 
 ifneq ($(GATES),yes)
 
 # RTL simulation:
-SIM_BUILD				= sim_build/rtl
+SIM_BUILD				= sim_build/$(TARGET)/rtl
 VERILOG_SOURCES += $(addprefix $(SRC_DIR)/,$(PROJECT_SOURCES))
 
 else
 
 # Gate level simulation:
-SIM_BUILD				= sim_build/gl
+SIM_BUILD				= sim_build/$(TARGET)/gl
 COMPILE_ARGS    += -DGL_TEST
 COMPILE_ARGS    += -DFUNCTIONAL
 COMPILE_ARGS    += -DSIM
@@ -41,6 +50,9 @@ TOPLEVEL = tb
 
 # List test modules to run, separated by commas and without the .py suffix:
 COCOTB_TEST_MODULES = test
+ifeq ($(TARGET),uart)
+COCOTB_TEST_MODULES = test_uart
+endif
 
 # include cocotb's make rules to take care of the simulator setup
 include $(shell cocotb-config --makefiles)/Makefile.sim
