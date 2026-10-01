@@ -24,24 +24,24 @@ project:
 # This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: "input_0"
-  ui[1]: "input_1"
-  ui[2]: "input_2"
-  ui[3]: "input_3"
-  ui[4]: "input_4"
-  ui[5]: "input_5"
-  ui[6]: "input_6"
-  ui[7]: "input_7"
+  ui[0]: "address_0 / register_0"
+  ui[1]: "address_1 / register_1"
+  ui[2]: "address_2"
+  ui[3]: "address_3"
+  ui[4]: "address_4"
+  ui[5]: "load_high_byte / readback_0"
+  ui[6]: "load_write / readback_1"
+  ui[7]: "run"
 
   # Outputs
-  uo[0]: "output_0"
-  uo[1]: "output_1"
-  uo[2]: "output_2"
-  uo[3]: "output_3"
-  uo[4]: "output_4"
-  uo[5]: "output_5"
-  uo[6]: "output_6"
-  uo[7]: "output_7"
+  uo[0]: "readback_0"
+  uo[1]: "readback_1"
+  uo[2]: "readback_2"
+  uo[3]: "readback_3"
+  uo[4]: "readback_4"
+  uo[5]: "readback_5"
+  uo[6]: "readback_6"
+  uo[7]: "readback_7"
 
   # Bidirectional pins
   uio[0]: "gpio_0"

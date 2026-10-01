@@ -2,6 +2,12 @@ name: gds
 
 on:
   push:
+    paths:
+      - 'src/**'
+      - 'info.yaml'
+      - 'test/**'
+      - 'scripts/prepare-functional-model.py'
+      - '.github/workflows/gds.yaml'
   workflow_dispatch:
 
 jobs:
