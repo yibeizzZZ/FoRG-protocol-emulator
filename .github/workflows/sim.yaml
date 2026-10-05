@@ -1,0 +1,39 @@
+name: sim
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  golden-model:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        seed: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        run: pip install -r sim/requirements.txt
+
+      - name: Firmware timing proofs
+        working-directory: sim
+        run: python -m forg check -v
+
+      - name: Constrained-random tests
+        working-directory: sim
+        env:
+          FORG_SEED: ${{ matrix.seed }}
+        run: python -m pytest -q
+
+      - name: Demos with waveforms
+        working-directory: sim
+        run: |
+          mkdir -p vcd
+          python -m forg demo all --vcd-dir vcd
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sim-waveforms-${{ matrix.seed }}
+          path: sim/vcd

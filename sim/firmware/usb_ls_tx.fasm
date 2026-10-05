@@ -1,0 +1,55 @@
+; USB low-speed (1.5 Mb/s) packet transmitter.
+; D- = uio2, D+ = uio3 (line unit drives D+ as the complement of D-).
+; NRZI, bit stuffing and CRC16 run in the line unit; firmware only frames.
+;
+; Host stream: header word {append_crc16 << 16 | payload_bytes}, then the
+; bytes SYNC, PID, payload... packed LSB first into words.
+; line_period = f_clk / 1.5 MHz, clkdiv = line_period / 8 (one tick = 1/8 bit).
+.program usb_ls_tx
+.define PERIOD 40
+.config out_base 2
+.config set_base 2
+.config set_count 2
+.config pindirs 0b1100
+.config pins 0b0100         ; idle J: D- high, D+ low
+.config line_period PERIOD
+.config line_nrzi 1
+.config line_stuff 6
+.config line_diff 1
+.config line_idle 1
+.config clkdiv PERIOD / 8
+.config crc_width 16
+.config crc_poly 0xA001
+.config crc_init 0xFFFF
+.config crc_src out
+.config out_shift right
+.config autopull 1
+
+.wrap_target
+start:
+    out x, 16               ; payload byte count
+    out y, 16               ; append CRC16?
+    ctl tx_reset
+    out line, 8             ; SYNC
+    out line, 8             ; PID
+    ctl crc_reset
+next:
+    jmp x--, payload
+    jmp tail
+payload:
+    out line, 8
+    jmp next
+tail:
+    jmp !y, eop
+    mov osr, ~crc
+    out line, 16
+eop:
+    ctl drain flush
+se0:
+    set pins, 0 [15]        ; SE0 for two bit times
+j:
+    set pins, 1 [7]         ; J for one bit time, then idle
+.wrap
+
+.assert_cycles se0 j 16
+.assert_cycles j start 8

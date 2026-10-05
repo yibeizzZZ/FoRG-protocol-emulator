@@ -1,0 +1,27 @@
+; UART receiver, 8N1, LSB first. 8 SM ticks per bit, same clkdiv as uart_tx.
+; The resync WAIT re-phases the clock divider on the start edge, so sampling
+; error is 1 system clock instead of 1 SM tick.
+; Bytes arrive in RX FIFO bits [31:24]. Framing errors raise IRQ 4.
+.program uart_rx
+.config in_base 19          ; RX on ui3
+.config jmp_pin 19
+.config in_shift right
+
+.wrap_target
+start:
+    wait 0 edge 0 resync    ; falling edge of start bit
+    set x, 7 [10]           ; to the middle of data bit 0
+bit:
+    in pins, 1
+    jmp x--, bit [6]
+check:
+    jmp pin, good           ; stop bit must be high
+    irq set 4
+    wait 1 pin 0
+    jmp start
+good:
+    push block
+.wrap
+
+.assert_cycles start bit 12
+.assert_cycles bit bit|check 8

@@ -1,0 +1,26 @@
+; UART transmitter, 8N1, LSB first. 8 SM ticks per bit.
+; clkdiv = f_clk / (8 * baud). Host pushes one byte per FIFO word.
+.program uart_tx
+.config out_base 8          ; TX on uo0
+.config out_count 1
+.config set_base 8
+.config set_count 1
+.config pins 0x100          ; idle high
+.config out_shift right
+
+.wrap_target
+start:
+    pull block
+    set x, 7
+start_bit:
+    set pins, 0 [7]         ; start bit
+bit:
+    out pins, 1
+    jmp x--, bit [6]
+stop_bit:
+    set pins, 1 [5]         ; stop bit (+ pull + set x = 8 ticks)
+.wrap
+
+.assert_cycles start_bit bit 8
+.assert_cycles bit bit|stop_bit 8
+.assert_cycles stop_bit start_bit 8

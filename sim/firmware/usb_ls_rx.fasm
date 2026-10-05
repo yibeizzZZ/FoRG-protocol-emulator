@@ -1,0 +1,28 @@
+; USB low-speed packet receiver (sniffer or host side).
+; D- = uio2, D+ = uio3. The line unit recovers the clock from transitions,
+; undoes NRZI and bit stuffing, and stops on SE0. Each byte is pushed in
+; bits [31:24]; end of packet pushes a STATUS word (bit 15 marker, bit 3 EOP,
+; bit 4 stuff error).
+.program usb_ls_rx
+.define PERIOD 40
+.config in_base 2
+.config line_period PERIOD
+.config line_nrzi 1
+.config line_stuff 6
+.config line_idle 1
+.config line_se0 1
+.config in_shift right
+.config autopush 1
+.config push_thresh 8
+.config trap eop
+
+.wrap_target
+start:
+    ctl rx_arm
+bytes:
+    in line, 8
+    jmp bytes
+eop:
+    mov isr, status
+    push block
+.wrap

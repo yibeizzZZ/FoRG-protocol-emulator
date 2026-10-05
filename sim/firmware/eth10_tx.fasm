@@ -1,0 +1,55 @@
+; 10BASE-T transmitter: Manchester-coded frames with hardware CRC32 (FCS),
+; TP_IDL after each frame, and normal link pulses while idle.
+; TD+ = uio4, TD- = uio5 (complement, from the line unit).
+;
+; Host stream: header word (frame bytes, dst MAC .. payload, no FCS), then
+; preamble+SFD as two words (0x55555555, 0xD5555555), then frame bytes packed
+; LSB first. Requires f_clk = 6 * 10 MHz (line_period 6).
+; The PULL stall timeout doubles as the 16 ms link pulse timer.
+.program eth10_tx
+.define NLP_TICKS 960000    ; 16 ms at 60 MHz
+.config out_base 4
+.config set_base 4
+.config set_count 2
+.config pindirs 0b110000
+.config pins 0
+.config line_period 6
+.config line_manchester 1
+.config line_diff 1
+.config crc_width 32
+.config crc_poly 0xEDB88320
+.config crc_init 0xFFFFFFFF
+.config crc_src out
+.config out_shift right
+.config autopull 1
+.config timeout NLP_TICKS
+.config trap nlp
+
+.wrap_target
+start:
+    out x, 32               ; frame length in bytes (waits; times out to nlp)
+    ctl tx_reset
+    out line, 32            ; preamble
+    out line, 32            ; preamble + SFD
+    ctl crc_reset
+next:
+    jmp x--, byte
+    jmp fcs
+byte:
+    out line, 8
+    jmp next
+fcs:
+    mov osr, ~crc
+    out line, 32
+    ctl drain flush
+tp_idl:
+    set pins, 1 [15]        ; TP_IDL: hold positive for ~270 ns
+    set pins, 0             ; differential idle
+.wrap
+nlp:
+    set pins, 1 [5]         ; 100 ns normal link pulse
+    set pins, 0
+    jmp start
+
+.assert_cycles tp_idl start 17
+.assert_cycles nlp start 8

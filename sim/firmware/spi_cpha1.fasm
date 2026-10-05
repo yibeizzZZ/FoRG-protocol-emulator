@@ -1,0 +1,34 @@
+; SPI controller, CPHA=1 (modes 1 and 3), MSB first, full duplex.
+; Same host protocol and pins as spi_cpha0.
+.program spi_cpha1
+.define CPOL 0
+.side_set 1
+.config side_base 8         ; SCK  uo0
+.config out_base 9          ; MOSI uo1
+.config out_count 1
+.config set_base 10         ; CS_n uo2
+.config set_count 1
+.config in_base 20          ; MISO ui4
+.config sync_bypass 1 << 20
+.config pins 0x400 | (CPOL << 8)
+.config out_shift left
+.config in_shift left
+.config autopull 1
+.config pull_thresh 32
+.config autopush 1
+.config push_thresh 8
+
+.wrap_target
+idle:
+    out x, 32           side CPOL
+    set pins, 0         side CPOL [1]
+bit:
+    out pins, 1         side 1-CPOL [1] ; leading edge: MOSI changes
+    in pins, 1          side CPOL       ; trailing edge: sample MISO
+    jmp x--, bit        side CPOL
+done:
+    ctl flush           side CPOL
+    set pins, 1         side CPOL [1]
+.wrap
+
+.assert_cycles bit bit|done 4

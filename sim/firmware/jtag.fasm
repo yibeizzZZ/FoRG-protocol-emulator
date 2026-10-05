@@ -1,0 +1,31 @@
+; JTAG controller: up to 32 TCK cycles per command with per-cycle TMS/TDI.
+; TCK = uo3, TDI = uo4, TMS = uo5, TDO = ui5.
+;
+; Host stream per command: (ncycles - 1), then two words of {TMS, TDI} pairs,
+; two bits per cycle, LSB first (cycle 0 in bits [1:0], TDI in the low bit).
+; Returns one word of TDO bits; cycle 0 ends up at bit (32 - ncycles).
+.program jtag
+.side_set 1
+.config side_base 11        ; TCK
+.config out_base 12         ; TDI, TMS
+.config out_count 2
+.config in_base 21          ; TDO
+.config sync_bypass 1 << 21
+.config pins 0
+.config out_shift right
+.config in_shift right
+.config autopull 1
+
+.wrap_target
+start:
+    out x, 32           side 0
+bit:
+    out pins, 2         side 0 [1]  ; TMS/TDI change while TCK low
+    in pins, 1          side 1      ; rising edge: TAP samples, TDO stable
+    jmp x--, bit        side 1
+done:
+    push block          side 0
+    ctl flush           side 0
+.wrap
+
+.assert_cycles bit bit|done 4

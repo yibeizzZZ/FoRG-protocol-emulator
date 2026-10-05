@@ -1,0 +1,9 @@
+; Run-length logic analyzer: one CAP per tick on 4 pins starting at ui3.
+; Each RX word is {duration_ticks[31:8], levels[7:0]} for one stable run, so
+; idle buses cost no FIFO bandwidth. RX overflow sets STATUS bit 6.
+.program logic_analyzer
+.config in_base 19
+
+.wrap_target
+    cap 4
+.wrap
