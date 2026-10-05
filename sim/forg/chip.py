@@ -1,6 +1,6 @@
 """Top-level chip model: shared instruction memory, state machines, GPIO and nets.
 
-Logical pin map (matches the Tiny Tapeout user interface):
+Logical pin map (matches the chip's ui/uo/uio pads):
 
     pins 0-7    uio[0..7]  bidirectional, open-drain capable
     pins 8-15   uo[0..7]   output only (always driven)

@@ -23,7 +23,7 @@ wrong with respect to this file.
 
 ## Pins
 
-| logical pin | TT pad   | direction     | notes                                |
+| logical pin | pad      | direction     | notes                                |
 |-------------|----------|---------------|--------------------------------------|
 | 0-7         | uio[0:7] | bidirectional | open-drain capable (`od` mask)       |
 | 8-15        | uo[0:7]  | output only   | always driven; uo7 = host MISO       |

@@ -1,42 +1,36 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg) ![](../../workflows/sim/badge.svg)
 
-# Tiny Tapeout Verilog Project Template
+# FoRG Protocol Emulator
 
-- [Read the documentation for project](docs/info.md)
+An open-source, general-purpose protocol emulator ASIC: four small,
+cycle-exact state machines that run UART, SPI, I2C, JTAG, USB low-speed and
+10BASE-T Ethernet as firmware instead of fixed logic. Built for the
+[Jane Street protocol emulator ASIC competition](https://blog.janestreet.com/)
+on IHP's 130nm CMOS5L process, 6x4 tiles.
 
-## What is Tiny Tapeout?
+## Repository layout
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+- [sim/](sim/README.md): software simulation, assembler, firmware, timing proofs and the verification suite. Start here.
+- [sim/docs/ISA.md](sim/docs/ISA.md): architecture and instruction set specification.
+- `src/`: RTL (Verilog).
+- `test/`: cocotb RTL testbench.
+- [docs/info.md](docs/info.md): project datasheet.
+- [info.yaml](info.yaml): project metadata, pinout and tile size used by the chip build.
 
-To learn more and get started, visit https://tinytapeout.com.
+## Quick start
 
-## Set up your Verilog project
+```sh
+cd sim
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m forg check -v
+.venv/bin/python -m pytest -q
+.venv/bin/python -m forg demo all --vcd-dir /tmp/forg
+```
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+## Building the chip
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
-
-## Enable GitHub actions to build the results page
-
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
-
-## Resources
-
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
-
-## What next?
-
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+The chip is fabricated through Tiny Tapeout, the shared-wafer service the
+competition uses. On every push, GitHub Actions turns the Verilog in `src/`
+into a chip layout (GDS) with [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/)
+and runs the RTL tests. To build locally, see the
+[local hardening guide](https://www.tinytapeout.com/guides/local-hardening/).

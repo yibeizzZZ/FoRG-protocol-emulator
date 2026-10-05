@@ -1,8 +1,8 @@
-# FoRG software simulation
+# FoRG Protocol Emulator: software simulation
 
 A cycle-accurate golden model, assembler, static timing prover and
-verification kit for the FoRG protocol emulator ASIC (Jane Street / Tiny
-Tapeout CMOS5L competition, 6x4 tiles).
+verification kit for the FoRG Protocol Emulator ASIC (Jane Street protocol
+emulator ASIC competition, IHP 130nm CMOS5L, 6x4 tiles).
 
 The idea is to settle the architecture in software first. Every protocol
 we want to claim runs as firmware on this model and is checked against an
@@ -32,7 +32,7 @@ is printed by every randomized test.
 - A per-SM line unit (serializer and deserializer with NRZI, bit stuffing,
   Manchester, differential output, SE0 detection, edge-aligned clock
   recovery) and a configurable bit-serial CRC.
-- Tiny Tapeout pin map with output-only and input-only pins, open-drain pins,
+- The chip's 24-pin map (8 bidirectional, 8 output-only, 8 input-only), open-drain pins,
   pull-ups, 2-flop input synchronizers (with bypass), registered outputs,
   wired-AND net resolution and bus contention detection.
 - Full spec: [docs/ISA.md](docs/ISA.md).
