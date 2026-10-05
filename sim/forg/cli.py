@@ -85,6 +85,13 @@ def cmd_area(args):
     return 0
 
 
+def cmd_figures(args):
+    from .figures import build
+
+    build(args.out, args.only)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="forg", description="FoRG protocol emulator toolkit")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -115,6 +122,11 @@ def main(argv=None):
     r.add_argument("--tiles", type=int, default=24)
     r.add_argument("--no-line", action="store_true")
     r.set_defaults(func=cmd_area)
+
+    f = sub.add_parser("figures", help="render presentation figures and an HTML gallery")
+    f.add_argument("--out", default="figures")
+    f.add_argument("--only", help="single figure, e.g. usb")
+    f.set_defaults(func=cmd_figures)
 
     args = ap.parse_args(argv)
     return args.func(args)

@@ -19,6 +19,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m forg demo all --vcd-dir /tmp/forg   # waveforms for GTKWave/Surfer
 .venv/bin/python -m forg asm firmware/uart_tx.fasm --hex uart_tx.hex
 .venv/bin/python -m forg area                # pre-synthesis area budget
+.venv/bin/python -m forg figures             # annotated PNGs + figures/index.html gallery
 ```
 
 Reproduce a random test failure with `FORG_SEED=<seed> pytest -q`; the seed
