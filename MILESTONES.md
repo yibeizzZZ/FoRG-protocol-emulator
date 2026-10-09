@@ -33,6 +33,16 @@ See `docs/uart-firmware.md` for reproduction commands, measurements, and
 limitations. Configurable baud timing and streaming payload input remain
 future experiments; no new physical or FPGA validation is claimed.
 
+## SPI capability experiment (2026-10-08)
+
+Mode-0 full-duplex firmware now exchanges one or two MSB-first bytes on the
+unchanged M2 engine. A shared bit loop and combined TX/RX register fit in
+31 words at the default 1.5625 MHz SCLK (50 MHz system clock). Both received
+bytes remain readable. Configurable timing, independent pin-level slave
+verification and architecture measurements are in `docs/spi-firmware.md`.
+This is an experiment on the current architecture, not an architecture
+freeze or a claim of streaming, arbitrary SPI modes, or physical validation.
+
 ---
 
 # Phase 0 — Infrastructure and Baseline

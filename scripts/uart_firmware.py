@@ -3,6 +3,17 @@
 import argparse
 from pathlib import Path
 
+if __package__:
+    from .pio_firmware import Program
+else:
+    # Preserve standalone CLI and importlib file loading without changing sys.path.
+    from importlib.util import module_from_spec, spec_from_file_location
+
+    _spec = spec_from_file_location("pio_firmware", Path(__file__).with_name("pio_firmware.py"))
+    _builder = module_from_spec(_spec)
+    _spec.loader.exec_module(_builder)
+    Program = _builder.Program
+
 
 CLOCK_HZ = 50_000_000
 CYCLES_PER_BIT = 434
@@ -20,58 +31,37 @@ def generate_uart_tx(payload):
     if any(type(byte) is not int or not 0 <= byte <= 255 for byte in payload):
         raise ValueError("each payload value must be an integer in 0..255")
 
-    words, labels, branches = [], {}, []
+    program = Program()
+    emit, label, jump, wait = program.emit, program.label, program.branch, program.wait
 
-    def emit(opcode, rd=0, rs=0, imm=0):
-        words.append((opcode << 12) | (rd << 10) | (rs << 8) | imm)
-
-    def label(name):
-        labels[name] = len(words)
-
-    def jump(opcode, target, rd=0):
-        branches.append((len(words), target))
-        emit(opcode, rd=rd)
-
-    def wait(cycles):
-        # WAIT n spends one issue cycle plus n stalled execution cycles.
-        while cycles:
-            chunk = min(cycles, 256)
-            emit(0x1, imm=chunk - 1)
-            cycles -= chunk
-
-    emit(0x4, rd=3, imm=len(payload))            # MOVI R3, frame count
-    emit(0x4, rd=0, imm=payload[0])              # MOVI R0, first byte
-    emit(0x0, imm=1)                            # SET 1 before driving TX
-    emit(0xA, imm=1)                            # DIR 1: only uio[0] drives
+    emit("MOVI", rd=3, imm=len(payload))        # MOVI R3, frame count
+    emit("MOVI", rd=0, imm=payload[0])          # MOVI R0, first byte
+    emit("SET", imm=1)                         # SET 1 before driving TX
+    emit("DIR", imm=1)                         # DIR 1: only uio[0] drives
     wait(CYCLES_PER_BIT - 2)                    # MOVI + SET complete idle bit
     label("frame")
-    emit(0x4, rd=2, imm=8)                      # MOVI R2, 8
-    emit(0x0, imm=0)                            # SET 0: start bit
+    emit("MOVI", rd=2, imm=8)                  # MOVI R2, 8
+    emit("SET", imm=0)                         # SET 0: start bit
     wait(CYCLES_PER_BIT - 3)                    # MOV + ANDI + OUT complete start
     label("bit")
-    emit(0x5, rd=1, rs=0)                       # MOV R1, R0
-    emit(0xB, rd=1, imm=1)                      # ANDI R1, 1
-    emit(0x9, rd=1)                             # OUT R1
-    emit(0x7, rd=0)                             # SHR R0
+    emit("MOV", rd=1, rs=0)                    # MOV R1, R0
+    emit("ANDI", rd=1, imm=1)                  # ANDI R1, 1
+    emit("OUT", rd=1)                         # OUT R1
+    emit("SHR", rd=0)                         # SHR R0
     wait(CYCLES_PER_BIT - 6)                    # SHR/ADDI/JNZ/MOV/ANDI/OUT
-    emit(0xC, rd=2, imm=255)                    # ADDI R2, -1
-    jump(0x6, "bit", rd=2)                     # JNZ R2, bit
+    emit("ADDI", rd=2, imm=255)                # ADDI R2, -1
+    jump("JNZ", "bit", rd=2)                 # JNZ R2, bit
     wait(2)                                    # Replace MOV + ANDI on loop exit
-    emit(0x0, imm=1)                            # SET 1: stop bit
+    emit("SET", imm=1)                         # SET 1: stop bit
     wait(CYCLES_PER_BIT - 6)                    # ADDI/JNZ/MOVI/JMP/MOVI/SET
-    emit(0xC, rd=3, imm=255)                    # ADDI R3, -1
-    jump(0x6, "second", rd=3)                  # JNZ R3, second
+    emit("ADDI", rd=3, imm=255)                # ADDI R3, -1
+    jump("JNZ", "second", rd=3)              # JNZ R3, second
     label("idle")
-    jump(0x2, "idle")                          # Keep TX driven; HALT releases it
+    jump("JMP", "idle")                      # Keep TX driven; HALT releases it
     label("second")
-    emit(0x4, rd=0, imm=payload[1] if len(payload) == 2 else 0)
-    jump(0x2, "frame")
-
-    if len(words) > 32:
-        raise ValueError("program exceeds the 32-word M2 instruction memory")
-    for address, target in branches:
-        words[address] |= labels[target]
-    return words
+    emit("MOVI", rd=0, imm=payload[1] if len(payload) == 2 else 0)
+    jump("JMP", "frame")
+    return program.assemble()
 
 
 def main():

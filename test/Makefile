@@ -10,7 +10,7 @@ PROJECT_SOURCES = project.v
 TESTBENCH = tb.v
 TOPLEVEL = tb
 TARGET ?= core
-ifeq ($(TARGET),core)
+ifneq ($(filter core spi_firmware,$(TARGET)),)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
 endif
@@ -71,6 +71,9 @@ COCOTB_TEST_MODULES = test_uart
 endif
 ifeq ($(TARGET),uart_firmware)
 COCOTB_TEST_MODULES = test_uart_firmware
+endif
+ifeq ($(TARGET),spi_firmware)
+COCOTB_TEST_MODULES = test_spi_firmware
 endif
 
 # include cocotb's make rules to take care of the simulator setup

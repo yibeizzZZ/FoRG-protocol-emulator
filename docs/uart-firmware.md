@@ -24,6 +24,9 @@ prints the hex image to stdout. Empty payloads, more than two bytes, and
 values outside 0..255 are rejected before writing a file. The Python API is
 `generate_uart_tx(payload) -> list[int]` in `scripts/uart_firmware.py`.
 Each hex line is one 16-bit instruction, not a byte.
+The generator now shares encoding, label resolution, exact-cycle WAITs and
+capacity checks with SPI through `scripts/pio_firmware.py`. Its public API,
+instruction image and UART timing remain unchanged.
 
 For hardware loading, use the existing [M2 host interface](isa.md). Hold
 RUN low; for each word address, write its low byte and then high byte using

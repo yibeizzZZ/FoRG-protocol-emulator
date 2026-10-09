@@ -51,6 +51,14 @@ jobs:
             python ../scripts/check-test-results.py results.xml
           done
 
+      - name: Check full-duplex SPI firmware
+        run: |
+          cd test
+          make -B TARGET=spi_firmware
+          cp results.xml results-spi-firmware.xml
+          cp tb.fst spi_firmware.fst
+          python ../scripts/check-test-results.py results.xml
+
       - name: Preserve the original engine regression
         run: |
           cd test
@@ -72,6 +80,7 @@ jobs:
           path: |
             test/tb.fst
             test/uart_firmware.fst
+            test/spi_firmware.fst
             test/results.xml
             test/results-*.xml
             test/output/*
