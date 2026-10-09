@@ -23,8 +23,8 @@ jobs:
         shell: bash
         run: pip install -r test/requirements.txt
 
-      - name: Test XML result validator
-        run: python -m unittest discover -s scripts -p 'test_check_test_results.py' -v
+      - name: Test Python tooling
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Run tests
         run: |
@@ -33,6 +33,13 @@ jobs:
           make
           # Preserve the report before validation can fail the step.
           cp results.xml results-core.xml
+          python ../scripts/check-test-results.py results.xml
+
+      - name: Check firmware UART against the fixed reference
+        run: |
+          cd test
+          make -B TARGET=uart_firmware
+          cp results.xml results-uart-firmware.xml
           python ../scripts/check-test-results.py results.xml
 
       - name: Check UART timing at multiple divisors
@@ -64,6 +71,7 @@ jobs:
           name: test-results
           path: |
             test/tb.fst
+            test/uart_firmware.fst
             test/results.xml
             test/results-*.xml
             test/output/*

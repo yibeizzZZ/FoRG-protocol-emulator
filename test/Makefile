@@ -7,10 +7,20 @@ FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = project.v
+TESTBENCH = tb.v
+TOPLEVEL = tb
 TARGET ?= core
 ifeq ($(TARGET),core)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
+endif
+ifeq ($(TARGET),uart_firmware)
+PROJECT_SOURCES = protocol_engine.v protocol_top.v uart_tx.v
+TESTBENCH = tb_uart_firmware.v
+TOPLEVEL = tb_uart_firmware
+ifeq ($(GATES),yes)
+$(error TARGET=uart_firmware uses an independent RTL reference; use TARGET=core for gate regressions)
+endif
 endif
 ifeq ($(TARGET),uart)
 PROJECT_SOURCES = uart_tx.v uart_baseline.v
@@ -49,8 +59,7 @@ endif
 COMPILE_ARGS 		+= -I$(SRC_DIR)
 
 # Include the testbench sources:
-VERILOG_SOURCES += $(PWD)/tb.v
-TOPLEVEL = tb
+VERILOG_SOURCES += $(PWD)/$(TESTBENCH)
 
 # List test modules to run, separated by commas and without the .py suffix:
 COCOTB_TEST_MODULES = test
@@ -59,6 +68,9 @@ COCOTB_TEST_MODULES = test_core
 endif
 ifeq ($(TARGET),uart)
 COCOTB_TEST_MODULES = test_uart
+endif
+ifeq ($(TARGET),uart_firmware)
+COCOTB_TEST_MODULES = test_uart_firmware
 endif
 
 # include cocotb's make rules to take care of the simulator setup

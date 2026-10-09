@@ -72,5 +72,7 @@ conditional branch, then halts. Each line is one 16-bit hexadecimal word.
 short loops and instruction experiments. Two validity bits per word allow
 safe execution after byte-wise loading without resetting all storage flops.
 Byte-wide GPIO and register readback support protocol experiments and tests.
-There is no FIFO, interrupt, multi-engine scheduler, assembler, or finished
-UART/SPI/I2C firmware. Physical measurements determine later revisions.
+M3's [UART TX firmware and generator](uart-firmware.md) use this unchanged ISA
+to transmit one or two bytes. There is no FIFO, interrupt, multi-engine
+scheduler, general assembler, or SPI/I2C firmware. Physical measurements
+determine later revisions.
