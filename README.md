@@ -6,14 +6,16 @@ An experimental programmable I/O engine for the Jane Street Protocol Emulator AS
 |---|---|---|
 | core (default) | protocol_engine.v, protocol_top.v | M2: 32x16 program memory, four registers, GPIO, waits, branches, shifts |
 | uart_firmware | M2 core plus isolated testbench reference | M3: firmware 8N1 TX, compared cycle-by-cycle with M1 |
+| i2c_firmware | protocol_engine.v, protocol_top.v | Address-write probe, ACK/NACK and clock stretching; isolated host programming and bus-idle qualification required |
 | spi_firmware | protocol_engine.v, protocol_top.v | Full-duplex Mode-0 SPI firmware and independent pin-level slave model |
 | uart | uart_tx.v, uart_baseline.v | M1: dedicated 8N1 UART transmitter and independent area/timing baseline |
 | legacy | project.v | Original 8-byte SET/WAIT/JMP engine and its regression |
 
 M3 firmware transmits one or two UART bytes on the unchanged M2 engine at
 434 cycles/bit. SPI firmware exchanges one or two bytes with configurable
-clock timing on the same engine; I2C remains future work. The fixed UART baseline
-is an independent reference and is not part of the core's ASIC.
+clock timing on the same engine. I2C firmware adds a 32-word address-write
+probe with ACK/NACK and clock stretching; data reads/writes remain unsupported.
+The fixed UART baseline is an independent reference and is not part of the core's ASIC.
 
 ## Local simulation on macOS
 
@@ -24,11 +26,13 @@ brew install icarus-verilog
 bash scripts/test-local.sh
 bash scripts/test-local.sh TARGET=uart_firmware
 bash scripts/test-local.sh TARGET=spi_firmware
+bash scripts/test-local.sh TARGET=i2c_firmware
 bash scripts/test-local.sh TARGET=uart UART_CLKS_PER_BIT=4
 bash scripts/test-local.sh TARGET=legacy
 ```
 
-Outputs are `test/results.xml` and `test/tb.fst`. Each run overwrites them. The launcher fails on simulation errors or failed assertions.
+Results are written to `test/results.xml`; waveforms use `test/tb.fst` or the
+firmware target's named `.fst` file. Repeated runs overwrite these files. The launcher fails on simulation errors or failed assertions.
 
 For an existing Python environment and a checkout without spaces:
 
@@ -52,6 +56,7 @@ Gate simulation uses the matching PDK revision and a zero-delay functional model
 - [Fixed UART contract and tests](docs/uart-baseline.md)
 - [Firmware UART, timing and measurements](docs/uart-firmware.md)
 - [Full-duplex SPI firmware and architecture evaluation](docs/spi-firmware.md)
+- [I2C address probe, host preconditions and architecture limits](docs/i2c-firmware.md)
 - [CI repair evidence and limitations](docs/ci-repair.md)
 - [Measured verification results](docs/results.md)
 - [Contribution workflow](CONTRIBUTING.md)

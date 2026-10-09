@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 GENERATORS = (
     ("uart_firmware", "generate_uart_tx", "uart_tx.hex", [0x55, 0xAA]),
+    ("i2c_firmware", "generate_i2c_probe", "i2c_probe.hex", 0x50),
     ("spi_firmware", "generate_spi_master", "spi_master.hex", [0xA5, 0x3C]),
 )
 
@@ -47,7 +48,7 @@ class FirmwareImportTests(unittest.TestCase):
     def test_module_cli_from_repository_root(self):
         for module, _, image, payload in GENERATORS:
             with self.subTest(module=module):
-                result = subprocess.run([sys.executable, "-m", f"scripts.{module}", *map(str, payload)],
+                result = subprocess.run([sys.executable, "-m", f"scripts.{module}", *map(str, payload if isinstance(payload, list) else [payload])],
                                         cwd=ROOT, capture_output=True, text=True, check=False)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual([int(word, 16) for word in result.stdout.split()], self.expected(image))

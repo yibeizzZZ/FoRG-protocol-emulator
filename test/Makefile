@@ -10,9 +10,21 @@ PROJECT_SOURCES = project.v
 TESTBENCH = tb.v
 TOPLEVEL = tb
 TARGET ?= core
-ifneq ($(filter core spi_firmware,$(TARGET)),)
+ifneq ($(filter core spi_firmware i2c_firmware,$(TARGET)),)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
+endif
+ifeq ($(TARGET),i2c_firmware)
+TESTBENCH = tb_i2c_firmware.v
+TOPLEVEL = tb_i2c_firmware
+I2C_RISE_NS ?= 0
+I2C_SCL_FALL_NS ?= 0
+I2C_SDA_FALL_NS ?= 0
+COMPILE_ARGS += -DI2C_RISE_NS=$(I2C_RISE_NS) -DI2C_SCL_FALL_NS=$(I2C_SCL_FALL_NS) -DI2C_SDA_FALL_NS=$(I2C_SDA_FALL_NS)
+export I2C_RISE_NS I2C_SCL_FALL_NS I2C_SDA_FALL_NS
+ifeq ($(GATES),yes)
+$(error TARGET=i2c_firmware uses an RTL wired bus; use TARGET=core for gate regressions)
+endif
 endif
 ifeq ($(TARGET),uart_firmware)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v uart_tx.v
@@ -74,6 +86,10 @@ COCOTB_TEST_MODULES = test_uart_firmware
 endif
 ifeq ($(TARGET),spi_firmware)
 COCOTB_TEST_MODULES = test_spi_firmware
+endif
+
+ifeq ($(TARGET),i2c_firmware)
+COCOTB_TEST_MODULES = test_i2c_firmware
 endif
 
 # include cocotb's make rules to take care of the simulator setup
