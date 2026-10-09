@@ -2,6 +2,12 @@ name: gds
 
 on:
   push:
+    paths:
+      - 'src/**'
+      - 'info.yaml'
+      - 'test/**'
+      - 'scripts/prepare-functional-model.py'
+      - '.github/workflows/gds.yaml'
   workflow_dispatch:
 
 jobs:
@@ -38,6 +44,8 @@ jobs:
         uses: TinyTapeout/tt-gds-action/gl_test@ihp-cmos5l
 
   viewer:
+    # Development branches must not replace the published main-branch viewer.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     needs: gds
     runs-on: ubuntu-24.04
     permissions:

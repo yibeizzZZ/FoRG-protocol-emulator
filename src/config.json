@@ -59,6 +59,8 @@
   "FP_IO_VLENGTH": 2,
 
   "FP_PDN_VPITCH": 38.87,
+  "//": "CMOS5L precheck requires Metal4 power pins at least 2.1 um wide.",
+  "PDN_VWIDTH": 2.1,
 
   "//": "Clock",
   "RUN_CTS": 1,

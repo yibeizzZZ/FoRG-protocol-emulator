@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Load firmware through the input pins, then check the output waveform."""
 from pathlib import Path
+import os
 
 import cocotb
 from cocotb.triggers import Timer
@@ -59,6 +60,13 @@ async def test_load_execute_and_reprogram(dut):
     path = Path(__file__).resolve().parents[1] / "firmware" / "blink.hex"
     program = [int(word, 16) for word in path.read_text().split()]
     await load_program(dut, program)
+    # Uninitialized instruction memory can propagate X through optimized gates
+    # during the first load. Reset execution state after memory is fully known.
+    # Program memory is preserved; later reprogramming still runs without reset.
+    if os.getenv("GATES") == "yes":
+        dut.rst_n.value = 0
+        await tick(dut)
+        dut.rst_n.value = 1
     await check_blink(dut, program)
 
     # Pausing via ena must hold all execution state.
@@ -80,3 +88,50 @@ async def test_load_execute_and_reprogram(dut):
     changed[3] = 0x10 | (((program[3] & 0x0F) + 3) % 16)
     await load_program(dut, changed)
     await check_blink(dut, changed)
+
+
+@cocotb.test(timeout_time=100, timeout_unit="us", skip=os.getenv("GATES") == "yes")
+async def test_pause_during_wait(dut):
+    """Check RTL execution state while paused in the middle of WAIT.
+
+    Skip gate-level simulation because synthesis may rename internal registers.
+    """
+    dut.clk.value = 0
+    dut.ena.value = 1
+    dut.rst_n.value = 0
+    dut.ui_in.value = 0
+    dut.uio_in.value = 0
+    await tick(dut)
+    dut.rst_n.value = 1
+
+    # SET 1, WAIT 3, SET 0, JMP 0.
+    await load_program(dut, [0x01, 0x13, 0x00, 0x20])
+    await tick(dut)  # Execute SET 1.
+    await tick(dut)  # Execute WAIT 3.
+    await tick(dut)  # Decrement the remaining wait from 3 to 2.
+
+    core = dut.user_project
+
+    def state():
+        return (
+            int(core.pc.value),
+            int(core.wait_count.value),
+            int(dut.uo_out.value),
+        )
+
+    before = state()
+    dut._log.info("Before pause (PC, WAIT, OUT): %s", before)
+    assert before == (2, 2, 1), f"Unexpected initial state: {before}"
+
+    # External clock edges continue while execution is disabled.
+    dut.ena.value = 0
+    for cycle in range(1, 4):
+        await tick(dut)
+        after = state()
+        dut._log.info("Paused cycle %d: %s", cycle, after)
+        assert after == before, f"Pause failed: before={before}, after={after}"
+
+    dut.ena.value = 1
+    await tick(dut)
+    dut._log.info("After resume: %s", state())
+    assert state() == (2, 1, 1), f"Unexpected resumed state: {state()}"

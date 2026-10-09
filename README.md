@@ -1,42 +1,51 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# FoRG Protocol Emulator
 
-# Tiny Tapeout Verilog Project Template
+An experimental programmable I/O engine for the Jane Street Protocol Emulator ASIC Competition, targeting Tiny Tapeout IHP CMOS5L, 6x4 tiles.
 
-- [Read the documentation for project](docs/info.md)
+| Target | Sources | Purpose |
+|---|---|---|
+| core (default) | protocol_engine.v, protocol_top.v | M2: 32x16 program memory, four registers, GPIO, waits, branches, shifts |
+| uart | uart_tx.v, uart_baseline.v | M1: dedicated 8N1 UART transmitter and independent area/timing baseline |
+| legacy | project.v | Original 8-byte SET/WAIT/JMP engine and its regression |
 
-## What is Tiny Tapeout?
+The programmable engine does not yet include complete UART/SPI/I2C firmware. UART firmware is M3; the fixed UART baseline is not part of the core's ASIC.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+## Local simulation on macOS
 
-To learn more and get started, visit https://tinytapeout.com.
+Prerequisites: Homebrew Icarus Verilog, uv, and make. The launcher creates a temporary Python 3.11 environment and handles checkout paths containing spaces. Initial setup requires downloads; subsequent runs can reuse uv's cache.
 
-## Set up your Verilog project
+```bash
+brew install icarus-verilog
+bash scripts/test-local.sh
+bash scripts/test-local.sh TARGET=uart UART_CLKS_PER_BIT=4
+bash scripts/test-local.sh TARGET=legacy
+```
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+Outputs are `test/results.xml` and `test/tb.fst`. Each run overwrites them. The launcher fails on simulation errors or failed assertions.
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+For an existing Python environment and a checkout without spaces:
 
-## Enable GitHub actions to build the results page
+```bash
+pip install -r test/requirements.txt
+cd test
+make
+make -B TARGET=uart UART_CLKS_PER_BIT=4
+make -B TARGET=legacy
+```
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+## ASIC verification
 
-## Resources
+The gds workflow builds the programmable core. The uart-baseline workflow builds the independent UART at 434 clock cycles per bit. Both run physical precheck and gate-level functional simulation. Published viewer deployment is restricted to the default branch so development branches cannot overwrite it. GitHub Pages requires repository-administrator setup.
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
+Gate simulation uses the matching PDK revision and a zero-delay functional model; it is not SDF timing verification. Static timing is reported by the physical design flow. Passing tests do not establish exhaustive correctness or physical-device validation.
 
-## What next?
+## Design and status
 
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+- [ISA and host interface](docs/isa.md)
+- [Fixed UART contract and tests](docs/uart-baseline.md)
+- [CI repair evidence and limitations](docs/ci-repair.md)
+- [Measured verification results](docs/results.md)
+- [Contribution workflow](CONTRIBUTING.md)
+- [Milestone roadmap](MILESTONES.md)
+
+All inputs must be synchronous to the design clock. No cloud FPGA access or external board is needed for local tests.

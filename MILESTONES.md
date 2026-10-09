@@ -6,6 +6,23 @@ The goal is not only to build a working protocol emulator, but to develop a comp
 
 The project targets the Jane Street Protocol Emulator ASIC Competition.
 
+## Development-branch status (2026-10-01)
+
+This is an evidence-based status snapshot, not a change to the later roadmap.
+
+| Milestone | Implementation | Remaining acceptance evidence |
+|---|---|---|
+| M0 | Complete for development: GDS, gate regression and all prechecks passed; local workflow and contribution conventions documented | Default-branch Pages setup remains an administrator task; development branches do not publish |
+| M1 | Complete: independent fixed UART, directed/random pin tests, synthesis, post-route gate tests, area/timing reports and all nine prechecks | No outstanding M1 acceptance checks |
+| M2 | Complete: ISA v0.1, program loading, registers, GPIO, waits, branches and shifts; all five tests pass RTL and post-route gates; physical area/timing reports and all nine prechecks pass | No outstanding M2 acceptance checks |
+
+See `docs/results.md`, `docs/isa.md`, and `docs/uart-baseline.md` for contracts
+and measured results. These changes are developed on a branch; main is not
+modified or automatically merged. M3 UART firmware and SVA/TLA+ work remain
+future work. The FPGA and verification schedule can be revised separately
+to reflect the team's recent meeting; this implementation does not claim
+those later milestones.
+
 ---
 
 # Phase 0 — Infrastructure and Baseline
