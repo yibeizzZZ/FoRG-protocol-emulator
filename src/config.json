@@ -19,6 +19,19 @@
   "//": "The value is in nanoseconds, so 20ns == 50MHz.",
   "CLOCK_PERIOD": 20,
 
+  "//": "Check every characterized corner; typical-only checks can hide slow-corner failures.",
+  "SETUP_VIOLATION_CORNERS": ["*"],
+  "MAX_SLEW_VIOLATION_CORNERS": ["*"],
+  "MAX_CAP_VIOLATION_CORNERS": ["*"],
+  "pdk::ihp-sg13cmos5l": {
+    "//": "The pinned LibreLane release otherwise optimizes only DEFAULT_CORNER during PnR.",
+    "PNR_CORNERS": [
+      "nom_fast_1p32V_m40C",
+      "nom_slow_1p08V_125C",
+      "nom_typ_1p20V_25C"
+    ]
+  },
+
   "//": "Hold slack margin - Increase them in case you are getting hold violations.",
   "PL_RESIZER_HOLD_SLACK_MARGIN": 0.1,
   "GRT_RESIZER_HOLD_SLACK_MARGIN": 0.05,

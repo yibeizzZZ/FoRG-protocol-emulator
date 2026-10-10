@@ -12,7 +12,8 @@ module protocol_engine (
     reg [127:0] valid_low, valid_high;
     reg [7:0] data_mem [0:31];
     reg [31:0] data_valid;
-    reg [7:0] registers [0:3];
+    // Keep operand reads parallel; shared memory ports serialize fault checking.
+    (* mem2reg *) reg [7:0] registers [0:3];
     reg [6:0] pc;
     reg [11:0] wait_count;
     reg [7:0] direction;
