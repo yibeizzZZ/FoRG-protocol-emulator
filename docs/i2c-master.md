@@ -85,7 +85,7 @@ hardware. The RAM size does not support arbitrary-length streaming.
 | 3 | Write address NACK |
 | 4 | Write data NACK |
 | 5 | Read address NACK |
-| 6 | SCL failed to rise before timeout |
+| 6 | SCL was not observed HIGH within the polling budget |
 | 7 | Bus not idle before START |
 | 8 | Invalid configuration |
 | 9 | SDA remained LOW after STOP was attempted |
@@ -121,8 +121,10 @@ accepted; changing timing changes WAIT constants, not address/payload logic.
 All delay issue cycles are counted by the shared assembler. The clock routine
 samples SCL again after each unsuccessful poll plus a 256-cycle WAIT. With
 `stretch_polls=255` the enabled-time timeout is approximately 1.326 ms;
-1..255 polls can be selected when generating the image. A slow pull-up can add
-one polling interval even without a target stretch. Pause stops the timeout
+1..255 polls can be selected when generating the image. This is a sampled
+timeout: a rise after the final unsuccessful sample does not cancel the error,
+which is reported after that sample's delay. A slow pull-up can add one polling
+interval even without a target stretch. Pause stops the timeout
 counter as well as instruction execution.
 
 Measured digital timing (minimum observed phases across the verification workload):
@@ -169,7 +171,8 @@ call depth is two. No register, opcode or RTL FSM represents an I2C protocol pha
 | Earlier I2C probe | 32 in legacy mode | Address-only, retained as regression |
 | Complete I2C master | 127 in extended mode | Independent runtime RAM, up to 15 TX + 15 RX bytes |
 
-Program storage and its selection logic dominate the additional area. The
+Program and data storage map to registers and selection logic rather than SRAM;
+isolating their individual area costs requires further measurement. The
 wider timer and generic input/branch primitives reduce firmware overhead;
 RAM separates configuration/payload from code and UI-only packets remove bus
 loading interference. UART/SPI can adopt the same RAM and instruction features

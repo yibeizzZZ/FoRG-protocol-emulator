@@ -23,6 +23,13 @@
   "SETUP_VIOLATION_CORNERS": ["*"],
   "MAX_SLEW_VIOLATION_CORNERS": ["*"],
   "MAX_CAP_VIOLATION_CORNERS": ["*"],
+  "//": "Repair slew and timing using routed parasitics, not only placement estimates.",
+  "RUN_POST_GRT_DESIGN_REPAIR": 1,
+  "RUN_POST_GRT_RESIZER_TIMING": 1,
+  "//": "Measured global-route slack was 4.96 ns optimistic versus extracted slow-corner STA.",
+  "GRT_RESIZER_SETUP_SLACK_MARGIN": 6.0,
+  "//": "Worst extracted slew was 1.81x its global-route estimate; retain a 50% repair margin.",
+  "GRT_DESIGN_REPAIR_MAX_SLEW_PCT": 50,
   "pdk::ihp-sg13cmos5l": {
     "//": "The pinned LibreLane release otherwise optimizes only DEFAULT_CORNER during PnR.",
     "PNR_CORNERS": [
