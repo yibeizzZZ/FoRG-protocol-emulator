@@ -71,6 +71,18 @@ jobs:
             python ../scripts/check-test-results.py results.xml
           done
 
+      - name: Check complete RAM-configured I2C transactions
+        run: |
+          cd test
+          for delays in "0 0 0" "0 300 0" "1000 0 300"; do
+            read -r rise scl_fall sda_fall <<< "$delays"
+            tag="$rise-$scl_fall-$sda_fall"
+            make -B TARGET=i2c_master I2C_RISE_NS=$rise I2C_SCL_FALL_NS=$scl_fall I2C_SDA_FALL_NS=$sda_fall
+            cp results.xml "results-i2c-master-$tag.xml"
+            cp i2c_firmware.fst "i2c_master-$tag.fst"
+            python ../scripts/check-test-results.py results.xml
+          done
+
       - name: Preserve the original engine regression
         run: |
           cd test
@@ -94,6 +106,7 @@ jobs:
             test/uart_firmware.fst
             test/spi_firmware.fst
             test/i2c_firmware*.fst
+            test/i2c_master*.fst
             test/results.xml
             test/results-*.xml
             test/output/*

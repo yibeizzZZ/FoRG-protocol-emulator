@@ -1,5 +1,10 @@
 # I2C firmware: address-write probe on M2
 
+This document describes the retained **legacy probe** and its original M2
+constraints. For multi-byte write/read and repeated-START transactions on the
+extended core, use [the complete I2C master](i2c-master.md). The probe remains
+unchanged as a compatibility regression.
+
 This experiment implements a **complete address-only write probe**, not a complete
 I2C data-transfer controller. It uses the unchanged programmable M2 engine and
 shared `scripts/pio_firmware.py` builder. No RTL, ISA, or dedicated protocol

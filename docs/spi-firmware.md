@@ -1,11 +1,15 @@
-# SPI Mode-0 firmware on the current M2 engine
+# SPI Mode-0 firmware using the legacy M2 ISA
 
-The current engine supports full-duplex SPI without changing RTL or ISA.
+The original M2 engine supports full-duplex SPI without changing its RTL or ISA.
 This experiment implements one or two arbitrary eight-bit bytes, MSB first,
 with one reusable bit loop. CS stays asserted across both bytes, with no
 extra inter-byte clock or gap. Both RX bytes remain available after completion.
 The default image is **31 words / 62 bytes**, with **32 system cycles per bit**
 and **1.5625 MHz SCLK at 50 MHz**. Timing is configurable at generation time.
+
+The extended core added for complete I2C runs this image in default legacy
+mode without firmware changes. The original experiment is documented below;
+current architecture costs are in [extended-core validation](pio-extended-validation.md).
 
 ## Feasibility and design decisions
 

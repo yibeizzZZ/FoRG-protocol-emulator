@@ -45,6 +45,20 @@ freeze or a claim of streaming, arbitrary SPI modes, or physical validation.
 
 ---
 
+## Complete I2C capability experiment (2026-10-10)
+
+The programmable engine now supports multi-byte I2C write/read and combined
+register reads with repeated START, master/target ACK/NACK, open-drain GPIO,
+bounded clock stretching and explicit completion/error status. A 127-word
+firmware image uses a general-purpose 128-word execution mode, 32-byte data RAM,
+shared subroutines and UI-only loading; original UART/SPI images still execute
+in compatible legacy mode. Address and payload changes require only RAM updates.
+See `docs/i2c-master.md` for supported limits and `docs/pio-extended-validation.md`
+for measured architecture cost and validation. This does not mark formal,
+analog, FPGA or tapeout-candidate milestones complete.
+
+---
+
 # Phase 0 — Infrastructure and Baseline
 
 ## Milestone 0 — Repository and Toolchain Setup

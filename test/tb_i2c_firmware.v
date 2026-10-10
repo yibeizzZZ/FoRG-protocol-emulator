@@ -25,7 +25,12 @@ module tb_i2c_firmware;
   assign #(`I2C_RISE_NS, `I2C_SDA_FALL_NS) sda = raw_sda;
   assign #(`I2C_RISE_NS, `I2C_SCL_FALL_NS) scl = raw_scl;
   // Models external host/bus isolation during programming; M2 has no such mux.
+`ifdef I2C_UI_HOST
+  // Full master uses UI-only host packets, with the physical bus always attached.
+  wire [7:0] inputs = {noise[7:2], scl, sda};
+`else
   wire [7:0] inputs = ui_in[7] ? {noise[7:2], scl, sda} : host_data;
+`endif
   tt_um_forg_protocol_engine user_project (
       .ui_in(ui_in), .uo_out(uo_out), .uio_in(inputs),
       .uio_out(uio_out), .uio_oe(uio_oe),

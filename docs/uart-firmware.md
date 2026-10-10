@@ -1,10 +1,15 @@
 # M3: firmware-based UART TX
 
-The unchanged M2 engine transmits UART 8N1 on `uio[0]`: start LOW, eight
+The M2-compatible engine transmits UART 8N1 on `uio[0]`: start LOW, eight
 data bits LSB first, no parity, stop HIGH. The generator accepts any one or
 two byte values. Both bytes are embedded in one program and transmit without
 host writes between them. Only `uio[0]` is enabled; all other GPIO outputs
 remain disabled. The core does not instantiate or use `uart_tx.v`.
+
+The extended core added for complete I2C runs this original image in default
+legacy mode with the same cycle timing. The firmware and measurements below
+describe the original M3 design; current physical costs are in
+[extended-core validation](pio-extended-validation.md).
 
 ## Generate and run
 
