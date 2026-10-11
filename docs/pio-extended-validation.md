@@ -36,8 +36,7 @@ invalid configuration and missing STOP. Seven actual firmware mutations must
 be rejected, in addition to mutations of captured traces.
 
 The synthesized standard-cell netlist passes all 16 core tests, all six SPI
-tests and all eight I2C master tests (the seven detailed tests plus a separate
-short write/readback/combined-transfer run). Gate simulation uses the matching
+tests and all eight I2C master tests. Gate simulation uses the matching
 PDK functional cell models without SDF delays; static timing is a separate
 physical-flow result.
 
@@ -110,16 +109,32 @@ the library signoff limit remains unchanged at 2.5074 ns. These margins
 strengthen optimization targets, not the reported timing requirements. Final
 physical results for this correction are pending.
 
+Subsequent configuration-only probes found that the all-corner 50% slew repair
+margin alone did not resize the failing drivers. Adding a general 300 µm wire
+length bound inserted 328 buffers across 233 nets (about 1.1% cell-area increase
+at that intermediate stage) and reduced both problem-net slew estimates. The
+saved `grt-margin6-wire300` candidate includes that bound; it still requires
+detailed routing, extraction and signoff. The bound is an experimental override
+and has not been added to the repository configuration.
+
 ## Physical flow provenance
 
 - LibreLane `3.1.0.dev3`, Yosys `0.66`.
 - Container `ghcr.io/librelane/librelane@sha256:d109140b8f17fc54f4fca998beb8124f4949404ec52e339eebd2250854a18b5a`.
 - Tiny Tapeout support tools `d66cf179e7bc4d296362ab7e2e3b344dc3c4f665`.
 - IHP Open PDK `2bbec755dc67ca3db0261c3d6163e15735d66710`, `ihp-sg13cmos5l`.
-- The local physical flow is in progress; final extracted timing, DRC/LVS,
-  GDS and precheck results will be recorded after completion.
+- Physical signoff is incomplete. Assistant-run background validation has been
+  stopped under the user's execution policy. The last completed extracted run
+  fails slow-corner timing; optimization estimates are not signoff results.
+  See the [user-operated handoff](i2c-validation-handoff.md) for the exact saved
+  checkpoint, experimental overrides and commands for the remaining checks.
 
 ## Reproduction
+
+Under the current execution policy, the user runs validation. Prefer the
+[staged local commands](i2c-validation-handoff.md) for the outstanding work;
+the workflow-dispatch command below starts expensive CI and requires approval
+before an assistant executes it. No automatic retry or push is authorized.
 
 The complete RTL commands and firmware generation are in
 [the I2C master documentation](i2c-master.md#reproduction-and-verification).
