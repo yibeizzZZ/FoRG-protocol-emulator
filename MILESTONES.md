@@ -18,10 +18,30 @@ This is an evidence-based status snapshot, not a change to the later roadmap.
 
 See `docs/results.md`, `docs/isa.md`, and `docs/uart-baseline.md` for contracts
 and measured results. These changes are developed on a branch; main is not
-modified or automatically merged. M3 UART firmware and SVA/TLA+ work remain
-future work. The FPGA and verification schedule can be revised separately
+modified or automatically merged. SVA/TLA+ work remains future work.
+The FPGA and verification schedule can be revised separately
 to reflect the team's recent meeting; this implementation does not claim
 those later milestones.
+
+## M3 firmware update (2026-10-08)
+
+The unchanged M2 engine now runs a 27-word UART TX program for one or two
+arbitrary bytes, at exactly 434 cycles per bit. Pin-level RTL tests compare
+8N1 frames with the independent fixed UART, including consecutive bytes,
+output enables, reset/reprogramming, and deliberate bad-firmware detection.
+See `docs/uart-firmware.md` for reproduction commands, measurements, and
+limitations. Configurable baud timing and streaming payload input remain
+future experiments; no new physical or FPGA validation is claimed.
+
+## SPI capability experiment (2026-10-08)
+
+Mode-0 full-duplex firmware now exchanges one or two MSB-first bytes on the
+unchanged M2 engine. A shared bit loop and combined TX/RX register fit in
+31 words at the default 1.5625 MHz SCLK (50 MHz system clock). Both received
+bytes remain readable. Configurable timing, independent pin-level slave
+verification and architecture measurements are in `docs/spi-firmware.md`.
+This is an experiment on the current architecture, not an architecture
+freeze or a claim of streaming, arbitrary SPI modes, or physical validation.
 
 ---
 

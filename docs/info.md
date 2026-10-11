@@ -2,7 +2,13 @@
 
 A minimal programmable I/O engine with 32 16-bit instructions, four 8-bit registers, byte-wide GPIO and direction control, deterministic waits, conditional and unconditional branches, shifts, and debug readback. The clock target is 50 MHz; actual timing must be checked in build reports.
 
-UART, SPI and I2C firmware are later milestones. The dedicated M1 UART is an independent baseline, not a block in this design.
+M3 UART TX firmware sends one or two 8N1 bytes at 434 cycles per bit on uio[0],
+using the unchanged M2 core. See docs/uart-firmware.md for loading and timing.
+SPI Mode-0 firmware also exchanges one or two bytes full duplex, with
+configurable clock timing; see docs/spi-firmware.md for pin mapping and the
+one-system-cycle MISO capture offset. I2C firmware is a later milestone.
+The dedicated M1 UART is an
+independent baseline, not a block in this design.
 
 ## Host interface
 

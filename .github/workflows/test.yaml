@@ -23,8 +23,8 @@ jobs:
         shell: bash
         run: pip install -r test/requirements.txt
 
-      - name: Test XML result validator
-        run: python -m unittest discover -s scripts -p 'test_check_test_results.py' -v
+      - name: Test Python tooling
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
 
       - name: Run tests
         run: |
@@ -35,6 +35,13 @@ jobs:
           cp results.xml results-core.xml
           python ../scripts/check-test-results.py results.xml
 
+      - name: Check firmware UART against the fixed reference
+        run: |
+          cd test
+          make -B TARGET=uart_firmware
+          cp results.xml results-uart-firmware.xml
+          python ../scripts/check-test-results.py results.xml
+
       - name: Check UART timing at multiple divisors
         run: |
           cd test
@@ -43,6 +50,14 @@ jobs:
             cp results.xml results-uart-$divisor.xml
             python ../scripts/check-test-results.py results.xml
           done
+
+      - name: Check full-duplex SPI firmware
+        run: |
+          cd test
+          make -B TARGET=spi_firmware
+          cp results.xml results-spi-firmware.xml
+          cp tb.fst spi_firmware.fst
+          python ../scripts/check-test-results.py results.xml
 
       - name: Preserve the original engine regression
         run: |
@@ -64,6 +79,8 @@ jobs:
           name: test-results
           path: |
             test/tb.fst
+            test/uart_firmware.fst
+            test/spi_firmware.fst
             test/results.xml
             test/results-*.xml
             test/output/*
