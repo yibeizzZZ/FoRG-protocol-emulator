@@ -138,7 +138,11 @@ PY
     ;;
 gates)
     sha256sum --check --status "$work/timing-ok.sha256"
-    test ! -e "$work/gates"
+    if [[ -e "$work/gates" ]]; then
+        echo "Gate validation directory already exists: $work/gates" >&2
+        echo "No simulation started. Existing results are preserved; inspect <target>/test/results.xml and <target>.log before deciding whether another run is needed." >&2
+        exit 1
+    fi
     sta_state=$(state_file "$route_run" openroad-stapostpnr)
     python3 - "$repo_dir" "$work" "$sta_state" <<'PY'
 import json, pathlib, shutil, sys
