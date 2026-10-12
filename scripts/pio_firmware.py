@@ -14,22 +14,50 @@ OPCODES = {
 
 
 class Program:
-    def __init__(self):
+    def __init__(self, *, extended=False):
+        self.extended = extended
+        self.capacity = 128 if extended else 32
         self._words = []
         self._labels = {}
         self._branches = []
 
     def emit(self, mnemonic, rd=0, rs=0, imm=0):
-        if not isinstance(mnemonic, str) or mnemonic not in OPCODES:
+        extra = {'JZ', 'OESET', 'OECLR', 'LDA', 'STA', 'LDB', 'STB',
+                 'CALL', 'RET', 'OR', 'DIRR', 'DJNZ', 'INBIT'}
+        if not isinstance(mnemonic, str) or mnemonic not in (set(OPCODES) | extra):
             raise ValueError(f"unknown instruction: {mnemonic!r}")
         for name, value, limit in (("rd", rd, 3), ("rs", rs, 3), ("imm", imm, 255)):
             if type(value) is not int or not 0 <= value <= limit:
                 raise ValueError(f"{name} must be an integer in 0..{limit}")
-        if mnemonic in ("JMP", "JNZ") and imm >= 32:
-            raise ValueError("branch address must fit the 5-bit PC")
-        if len(self._words) >= 32:
-            raise ValueError("program exceeds the 32-word M2 instruction memory")
-        self._words.append((OPCODES[mnemonic] << 12) | (rd << 10) | (rs << 8) | imm)
+        if self.extended and mnemonic in ('NOP', 'WAIT') and (rd or rs):
+            raise ValueError("extended NOP/WAIT cannot carry register operands; use wait() for long delays")
+        if mnemonic in extra and not self.extended:
+            raise ValueError("instruction requires extended PIO mode")
+        if mnemonic in ('JMP', 'JNZ', 'JZ', 'CALL', 'DJNZ') and imm >= self.capacity:
+            raise ValueError("branch address exceeds program memory")
+        if len(self._words) >= self.capacity:
+            raise ValueError(f"program exceeds the {self.capacity}-word instruction memory")
+        if mnemonic in ('LDA', 'STA'):
+            if imm >= 32:
+                raise ValueError("data address must be in 0..31")
+            word = (0xE600 if mnemonic == 'LDA' else 0xE700) | (rd << 6) | imm
+        elif mnemonic in ('LDB', 'STB', 'OR'):
+            word = {'LDB': 0xE800, 'STB': 0xE900, 'OR': 0xEC00}[mnemonic] | (rd << 2) | rs
+        elif mnemonic == 'DIRR':
+            word = 0xED00 | rd
+        elif mnemonic == 'INBIT':
+            if imm >= 8:
+                raise ValueError("input pin must be in 0..7")
+            word = 0xFC00 | (rd << 3) | imm
+        elif mnemonic == 'JZ':
+            word = 0xE000 | (rd << 8) | imm
+        elif mnemonic == 'DJNZ':
+            word = 0xF800 | (rd << 8) | imm
+        elif mnemonic in ('OESET', 'OECLR', 'CALL', 'RET'):
+            word = {'OESET':0xE400, 'OECLR':0xE500, 'CALL':0xEA00, 'RET':0xEB00}[mnemonic] | imm
+        else:
+            word = (OPCODES[mnemonic] << 12) | (rd << 10) | (rs << 8) | imm
+        self._words.append(word)
 
     def label(self, name):
         if name in self._labels:
@@ -37,8 +65,8 @@ class Program:
         self._labels[name] = len(self._words)
 
     def branch(self, mnemonic, target, rd=0):
-        if mnemonic not in ("JMP", "JNZ"):
-            raise ValueError("a labeled branch must use JMP or JNZ")
+        if mnemonic not in ("JMP", "JNZ", "JZ", "DJNZ", "CALL"):
+            raise ValueError("invalid labeled branch instruction")
         self.emit(mnemonic, rd=rd)
         self._branches.append((len(self._words) - 1, target))
 
@@ -46,11 +74,12 @@ class Program:
         """Emit a delay of exactly cycles, including WAIT issue cycles."""
         if type(cycles) is not int or cycles < 0:
             raise ValueError("delay must be a nonnegative integer cycle count")
-        if len(self._words) + (cycles + 255) // 256 > 32:
-            raise ValueError("delay exceeds the 32-word M2 instruction memory")
+        limit = 4096 if self.extended else 256
+        if len(self._words) + (cycles + limit - 1) // limit > self.capacity:
+            raise ValueError(f"delay exceeds the {self.capacity}-word instruction memory")
         while cycles:
-            chunk = min(cycles, 256)
-            self.emit("WAIT", imm=chunk - 1)
+            chunk = min(cycles, limit)
+            self._words.append(0x1000 | (chunk - 1))
             cycles -= chunk
 
     def assemble(self):
