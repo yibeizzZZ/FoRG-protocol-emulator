@@ -44,6 +44,19 @@ class PIOHostTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 call()
 
+    def test_transactional_images(self):
+        api = self.api()
+        for size, extended in ((1, False), (32, False), (128, True)):
+            words = [0xD000] * size
+            self.assertEqual(self.decode(api.program_writes(words, extended=extended,
+                                                           transactional=True)),
+                             [(254, (int(extended) << 8) | size)] +
+                             list(enumerate(words)) + [(253, 0)])
+        for words, extended in (([], False), ([0] * 33, False), ([0] * 129, True),
+                                ([True], False), ([-1], False), ([65536], True)):
+            with self.assertRaises(ValueError):
+                api.program_writes(words, extended=extended, transactional=True)
+
 
 if __name__ == '__main__':
     unittest.main()

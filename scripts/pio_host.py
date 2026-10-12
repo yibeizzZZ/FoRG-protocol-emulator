@@ -17,17 +17,25 @@ def _packet(address, value):
     return commands
 
 
-def program_writes(words, *, extended=False):
-    """Atomic 16-bit program writes; mode switch precedes the program image."""
+def program_writes(words, *, extended=False, transactional=False):
+    """Encode an image; transactional=True requires BEGIN/COMMIT-capable RTL.
+
+    Transactional replacement invalidates old code/data and prevents execution
+    until all words arrive. The returned sequence leaves RUN low; read loader
+    status (ui_in=0x1d, expect uo_out=0xc0) before asserting RUN.
+    """
     words = list(words)
     capacity = 128 if extended else 32
     if not 1 <= len(words) <= capacity:
         raise ValueError(f'program must contain 1..{capacity} words')
     if any(type(word) is not int or not 0 <= word <= 65535 for word in words):
         raise ValueError('program words must be 16-bit integers')
-    commands = [0] + _packet(255, int(bool(extended)))
+    commands = [0] + (_packet(254, (int(bool(extended)) << 8) | len(words))
+                      if transactional else _packet(255, int(bool(extended))))
     for address, word in enumerate(words):
         commands.extend(_packet(address, word))
+    if transactional:
+        commands.extend(_packet(253, 0))
     return commands + [0]
 
 

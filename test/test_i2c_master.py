@@ -39,16 +39,20 @@ async def reset(dut):
     await tick(dut)
 
 
-async def load_program(dut, words=None):
+async def load_program(dut, words=None, *, transactional=False):
     words = generate_i2c_master() if words is None else words
     assert len(words) <= 128
     dut._log.debug('Loading %d firmware words through UI-only packets', len(words))
     # UI-only loading leaves the resolved SDA/SCL continuously connected.
-    for command in program_writes(words, extended=True):
+    for command in program_writes(words, extended=True, transactional=transactional):
         dut.ui_in.value = command
         await tick(dut)
         assert int(dut.uio_oe.value) == 0, 'Program loading drove the bus'
         assert int(dut.sda.value) == int(dut.scl.value) == 1, 'Program loading disturbed idle pull-ups'
+    if transactional:
+        dut.ui_in.value = 0x1D
+        await Timer(1, unit='ns')
+        assert int(dut.uo_out.value) == 0xC0, 'Image must be committed before I2C runs'
 
 
 async def configure(dut, data):
@@ -160,7 +164,7 @@ async def transact(dut, address, write=b'', read_count=0, *, slave=None,
 async def test_register_write_readback_smoke(dut):
     """Short, independently checked workload also used on the routed netlist."""
     await reset(dut)
-    await load_program(dut)
+    await load_program(dut, transactional=True)
     written = await transact(dut, 0x50, b'\x20\x00\xff\x96\x69')
     target = I2CMemorySlave(0x50, memory=written.memory, pointer=0x20)
     await transact(dut, 0x50, read_count=4, slave=target)

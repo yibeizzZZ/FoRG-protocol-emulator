@@ -9,6 +9,13 @@ reset. The physical core now contains 128 words and data RAM; legacy execution
 still wraps at 32 words. Existing UART, SPI, and probe images and loaders remain
 valid. See the extension section below for the new mode and loading commands.
 
+For safe whole-image replacement, use the opt-in [runtime Program Loader](program-loader.md):
+BEGIN (`fe`) declares length/mode, sequential word packets load the image, and
+COMMIT (`fd`) enables RUN only after completion. Instruction encodings and cycle
+counts are unchanged. Legacy host behavior below applies until the first BEGIN
+after reset; managed mode blocks legacy code/mode writes until reset. Stopped
+UI selectors `1b/1c/1d` read image length/count/status.
+
 ## Legacy state and host interface
 
 - 32 words of 16-bit writable instruction storage; 5-bit wrapping PC.

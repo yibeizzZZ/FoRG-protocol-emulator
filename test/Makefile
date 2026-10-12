@@ -10,7 +10,7 @@ PROJECT_SOURCES = project.v
 TESTBENCH = tb.v
 TOPLEVEL = tb
 TARGET ?= core
-ifneq ($(filter core spi_firmware i2c_firmware i2c_master,$(TARGET)),)
+ifneq ($(filter core loader spi_firmware i2c_firmware i2c_master,$(TARGET)),)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
 endif
@@ -73,7 +73,10 @@ VERILOG_SOURCES += $(PWD)/$(TESTBENCH)
 # List test modules to run, separated by commas and without the .py suffix:
 COCOTB_TEST_MODULES = test
 ifeq ($(TARGET),core)
-COCOTB_TEST_MODULES = test_core
+COCOTB_TEST_MODULES = test_core,test_program_loader
+endif
+ifeq ($(TARGET),loader)
+COCOTB_TEST_MODULES = test_program_loader
 endif
 ifeq ($(TARGET),uart)
 COCOTB_TEST_MODULES = test_uart

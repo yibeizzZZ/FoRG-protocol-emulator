@@ -56,6 +56,7 @@ Gate simulation uses the matching PDK revision and a zero-delay functional model
 
 ## Design and status
 
+- [Runtime firmware loader, atomic replacement and pin protocol](docs/program-loader.md)
 - [ISA and host interface](docs/isa.md)
 - [Fixed UART contract and tests](docs/uart-baseline.md)
 - [Firmware UART, timing and measurements](docs/uart-firmware.md)

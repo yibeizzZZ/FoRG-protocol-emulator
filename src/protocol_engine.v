@@ -23,6 +23,9 @@ module protocol_engine (
     reg [19:0] packet_shift;
     reg [2:0] packet_phase;
     reg packet_strobe;
+    // Opt-in image transactions reuse the UI packet transport and storage.
+    reg loader_managed, loader_committed, loader_error;
+    reg [7:0] loader_length, loader_count;
     wire [7:0] packet_address = packet_shift[19:12];
     wire [15:0] packet_value = {packet_shift[11:0], control[3:0]};
     reg [6:0] return_stack [0:3];
@@ -51,8 +54,13 @@ module protocol_engine (
         opcode == 4'he;
     integer i;
 
-    assign pins_oe = (run && rst_n && !halted && !fault) ? direction : 8'b0;
-    assign readback = control[6:5] == 2'b00 ?
+    assign pins_oe = (run && rst_n && !halted && !fault &&
+                      (!loader_managed || loader_committed)) ? direction : 8'b0;
+    assign readback = !run && control == 8'h1d ?
+                          {loader_managed, loader_committed, loader_error, 5'b0} :
+                      !run && control == 8'h1c ? loader_count :
+                      !run && control == 8'h1b ? loader_length :
+                      control[6:5] == 2'b00 ?
                           (extended ? (data_valid[control[4:0]] ? data_mem[control[4:0]] : 8'b0) : pins_out) :
                       control[6:5] == 2'b01 ? {fault, halted, (wait_count != 0), pc[4:0]} :
                       control[6:5] == 2'b10 ? registers[control[1:0]] :
@@ -68,6 +76,11 @@ module protocol_engine (
             host_bank <= 0;
             packet_phase <= 0;
             packet_strobe <= 0;
+            loader_managed <= 0;
+            loader_committed <= 0;
+            loader_error <= 0;
+            loader_length <= 0;
+            loader_count <= 0;
             stack_depth <= 0;
             pc <= 0;
             wait_count <= 0;
@@ -98,16 +111,47 @@ module protocol_engine (
                         packet_strobe <= control[4];
                         if (packet_phase == 5) begin
                             packet_phase <= 0;
-                            if (!packet_address[7]) begin
-                                program_mem[packet_address[6:0]] <= packet_value;
-                                valid_low[packet_address[6:0]] <= 1'b1;
-                                valid_high[packet_address[6:0]] <= 1'b1;
+                            if (packet_address == 8'hfe) begin
+                                // BEGIN: bit 8 selects extended ISA, low byte is
+                                // length (1..32 legacy, 1..128 extended).
+                                loader_managed <= 1;
+                                loader_committed <= 0;
+                                loader_error <= packet_value[15:9] != 0 ||
+                                    packet_value[7:0] == 0 ||
+                                    packet_value[7:0] > (packet_value[8] ? 128 : 32);
+                                loader_length <= packet_value[7:0];
+                                loader_count <= 0;
+                                valid_low <= 0;
+                                valid_high <= 0;
+                                data_valid <= 0;
+                                extended <= packet_value[8];
+                                host_bank <= 0;
+                            end else if (!packet_address[7]) begin
+                                if (!loader_managed || (!loader_error && !loader_committed &&
+                                    {1'b0, packet_address[6:0]} == loader_count &&
+                                    loader_count < loader_length)) begin
+                                    program_mem[packet_address[6:0]] <= packet_value;
+                                    valid_low[packet_address[6:0]] <= 1'b1;
+                                    valid_high[packet_address[6:0]] <= 1'b1;
+                                    if (loader_managed) loader_count <= loader_count + 1'b1;
+                                end else begin
+                                    loader_error <= 1;
+                                    loader_committed <= 0;
+                                end
                             end else if (packet_address[7:5] == 3'b100 && packet_value[15:8] == 0) begin
                                 data_mem[packet_address[4:0]] <= packet_value[7:0];
                                 data_valid[packet_address[4:0]] <= 1'b1;
-                            end else if (packet_address == 8'hff && packet_value[15:1] == 0) begin
+                            end else if (packet_address == 8'hfd && loader_managed &&
+                                         packet_value == 0 && !loader_error &&
+                                         !loader_committed && loader_count == loader_length) begin
+                                loader_committed <= 1;
+                            end else if (packet_address == 8'hff && packet_value[15:1] == 0 &&
+                                         !loader_managed) begin
                                 extended <= packet_value[0];
                                 host_bank <= 0;
+                            end else if (loader_managed) begin
+                                loader_error <= 1;
+                                loader_committed <= 0;
                             end
                         end else begin
                             packet_shift <= {packet_shift[15:0], control[3:0]};
@@ -115,10 +159,18 @@ module protocol_engine (
                         end
                     end
                 end else if (control == 8'h1f) begin
-                    extended <= pins_in[7];
-                    host_bank <= pins_in[2:0];
+                    if (loader_managed) begin
+                        loader_error <= 1;
+                        loader_committed <= 0;
+                    end else begin
+                        extended <= pins_in[7];
+                        host_bank <= pins_in[2:0];
+                    end
                 end else if (control[6]) begin
-                    if (host_bank < 4) begin
+                    if (loader_managed) begin
+                        loader_error <= 1;
+                        loader_committed <= 0;
+                    end else if (host_bank < 4) begin
                         if (control[5]) begin
                             program_mem[host_address][15:8] <= pins_in;
                             valid_high[host_address] <= 1'b1;
@@ -131,6 +183,12 @@ module protocol_engine (
                         data_valid[control[4:0]] <= 1'b1;
                     end
                 end
+            end else if (loader_managed && (!loader_committed || packet_phase != 0)) begin
+                // Never execute a prefix, stale tail, or an interrupted packet.
+                loader_error <= 1;
+                loader_committed <= 0;
+                halted <= 1;
+                fault <= 1;
             end else if (!halted) begin
                 if (wait_count != 0) begin
                     wait_count <= wait_count - 1'b1;

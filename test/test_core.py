@@ -518,7 +518,8 @@ async def test_ui_packet_invalid_frames_mode_and_reset(dut):
     dut.uio_in.value = 0xFF
     await send_packet(dut, 255, 1)
     await send_packet(dut, 0x80, 0x005A)
-    for address, value in ((0xA0, 0xD000), (0xFE, 0xFFFF), (0x80, 0xFF33), (255, 2)):
+    # FE is now BEGIN; FC remains a reserved address for the legacy rejection check.
+    for address, value in ((0xA0, 0xD000), (0xFC, 0xFFFF), (0x80, 0xFF33), (255, 2)):
         await send_packet(dut, address, value)
     assert await read_mux(dut, 0x80) == 0x5A
     # Packet mode writes reset the parallel loader bank to zero.
