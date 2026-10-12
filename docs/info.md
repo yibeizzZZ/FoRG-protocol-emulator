@@ -1,16 +1,25 @@
 ## How it works
 
-A minimal programmable I/O engine with 32 16-bit instructions, four 8-bit registers, byte-wide GPIO and direction control, deterministic waits, conditional and unconditional branches, shifts, and debug readback. The clock target is 50 MHz; actual timing must be checked in build reports.
+A minimal programmable I/O engine with 128 16-bit instructions (32-word legacy mode), four 8-bit registers, byte-wide GPIO and direction control, deterministic waits, conditional and unconditional branches, shifts, and debug readback. The clock target is 50 MHz; actual timing must be checked in build reports.
 
 M3 UART TX firmware sends one or two 8N1 bytes at 434 cycles per bit on uio[0],
 using the unchanged M2 core. See docs/uart-firmware.md for loading and timing.
-SPI Mode-0 firmware also exchanges one or two bytes full duplex, with
+SPI Modes 0–3 firmware also exchanges one or two bytes full duplex, with
 configurable clock timing; see docs/spi-firmware.md for pin mapping and the
-one-system-cycle MISO capture offset. I2C firmware is a later milestone.
+one-system-cycle MISO capture offset. RAM-configured I2C master firmware is
+documented in docs/i2c-master.md.
 The dedicated M1 UART is an
 independent baseline, not a block in this design.
 
 ## Host interface
+
+The current extended core has 128x16 program words and 32 data bytes; legacy
+execution still wraps at 32 words. The UI-only runtime loader supports safe
+whole-image replacement without reset, synthesis, or driving the protocol
+GPIO. BEGIN, sequential word packets and COMMIT prevent execution of partial
+images. See [the loader protocol](program-loader.md) for pins, clock timing,
+status and UART-to-SPI replacement. Extended I2C firmware uses the same loader
+and GPIO engine; it is not a dedicated I2C hardware peripheral.
 
 All inputs must be synchronous to clk. rst_n is synchronous active-low reset; reset invalidates the program and requires reloading. ena pauses sequential state. GPIO is released while reset, stopped, halted, or faulted.
 

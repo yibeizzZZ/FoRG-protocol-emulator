@@ -10,9 +10,22 @@ PROJECT_SOURCES = project.v
 TESTBENCH = tb.v
 TOPLEVEL = tb
 TARGET ?= core
-ifneq ($(filter core spi_firmware,$(TARGET)),)
+ifneq ($(filter core loader spi_firmware i2c_firmware i2c_master uart_rx,$(TARGET)),)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v
 COMPILE_ARGS += -DPROJECT_TOP=tt_um_forg_protocol_engine
+endif
+ifneq ($(filter i2c_firmware i2c_master,$(TARGET)),)
+TESTBENCH = tb_i2c_firmware.v
+TOPLEVEL = tb_i2c_firmware
+I2C_RISE_NS ?= 0
+I2C_SCL_FALL_NS ?= 0
+I2C_SDA_FALL_NS ?= 0
+I2C_SDA_RISE_NS ?= $(I2C_RISE_NS)
+I2C_SCL_RISE_NS ?= $(I2C_RISE_NS)
+COMPILE_ARGS += -DI2C_SDA_RISE_NS=$(I2C_SDA_RISE_NS) -DI2C_SCL_RISE_NS=$(I2C_SCL_RISE_NS)
+export I2C_SDA_RISE_NS I2C_SCL_RISE_NS
+COMPILE_ARGS += -DI2C_RISE_NS=$(I2C_RISE_NS) -DI2C_SCL_FALL_NS=$(I2C_SCL_FALL_NS) -DI2C_SDA_FALL_NS=$(I2C_SDA_FALL_NS)
+export I2C_RISE_NS I2C_SCL_FALL_NS I2C_SDA_FALL_NS
 endif
 ifeq ($(TARGET),uart_firmware)
 PROJECT_SOURCES = protocol_engine.v protocol_top.v uart_tx.v
@@ -64,7 +77,13 @@ VERILOG_SOURCES += $(PWD)/$(TESTBENCH)
 # List test modules to run, separated by commas and without the .py suffix:
 COCOTB_TEST_MODULES = test
 ifeq ($(TARGET),core)
-COCOTB_TEST_MODULES = test_core
+COCOTB_TEST_MODULES = test_core,test_program_loader
+endif
+ifeq ($(TARGET),loader)
+COCOTB_TEST_MODULES = test_program_loader
+endif
+ifeq ($(TARGET),uart_rx)
+COCOTB_TEST_MODULES = test_uart_rx
 endif
 ifeq ($(TARGET),uart)
 COCOTB_TEST_MODULES = test_uart
@@ -74,6 +93,15 @@ COCOTB_TEST_MODULES = test_uart_firmware
 endif
 ifeq ($(TARGET),spi_firmware)
 COCOTB_TEST_MODULES = test_spi_firmware
+endif
+
+ifeq ($(TARGET),i2c_firmware)
+COCOTB_TEST_MODULES = test_i2c_firmware
+endif
+
+ifeq ($(TARGET),i2c_master)
+COMPILE_ARGS += -DI2C_UI_HOST
+COCOTB_TEST_MODULES = test_i2c_master
 endif
 
 # include cocotb's make rules to take care of the simulator setup
