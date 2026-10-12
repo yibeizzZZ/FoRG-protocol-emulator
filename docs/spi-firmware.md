@@ -1,15 +1,52 @@
-# SPI Mode-0 firmware using the legacy M2 ISA
+# SPI Modes 0–3 firmware using the legacy M2 ISA
 
 The original M2 engine supports full-duplex SPI without changing its RTL or ISA.
-This experiment implements one or two arbitrary eight-bit bytes, MSB first,
+The generator implements all four CPOL/CPHA modes, with one or two arbitrary eight-bit bytes, MSB first,
 with one reusable bit loop. CS stays asserted across both bytes, with no
 extra inter-byte clock or gap. Both RX bytes remain available after completion.
-The default image is **31 words / 62 bytes**, with **32 system cycles per bit**
+The default Mode-0 image is **31 words / 62 bytes**, with **32 system cycles per bit**
 and **1.5625 MHz SCLK at 50 MHz**. Timing is configurable at generation time.
 
 The extended core added for complete I2C runs this image in default legacy
-mode without firmware changes. The original experiment is documented below;
+mode without firmware changes. Mode 0's original API and every generated word
+are preserved; the checked-in `firmware/spi_master.hex` is unchanged. Modes 1–3
+also use only legacy instructions, the same four registers, and at most 32 words.
+There are no RTL, ISA, pin-map or physical-configuration changes. The original
+Mode-0 instruction accounting remains below;
 current architecture costs are in [extended-core validation](pio-extended-validation.md).
+
+## Mode selection and supported timing
+
+```python
+generate_spi_master(payload, *, half_period_cycles=16, mode=0)
+```
+
+`mode` is an integer from 0 through 3; omitting it preserves the original API.
+Booleans, floats and strings are rejected. H denotes `half_period_cycles`, in
+system clocks, with identical bounds for one- and two-byte transactions.
+
+| Mode | CPOL/CPHA | Idle SCLK | Sample edge | Setup edge | H range | Words at H=16 |
+|---|---|---|---|---|---|---|
+| 0 | 00 | LOW | Leading/rising | Trailing/falling | 13–269 | 31 |
+| 1 | 01 | LOW | Trailing/falling | Leading/rising | 16–272 | 30 |
+| 2 | 10 | HIGH | Leading/falling | Trailing/rising | 14–262 | 32 |
+| 3 | 11 | HIGH | Trailing/rising | Leading/falling | 15–515 | 30 |
+
+All modes default to H=16: 32 cycles/bit, 1.5625 MHz at 50 MHz. In general,
+SCLK frequency is `system_clock_hz / (2*H)`. Unsupported values fail before
+writing a CLI destination. These are limits of these balanced firmware loops,
+not fundamental limits of the ISA or electrical timing guarantees.
+
+| Mode | Program size by H |
+|---|---|
+| 0 | H=13: 30; H=14–262: 31; H=263–269: 32 words |
+| 1 | H=16: 30; H=17–259: 31; H=260–272: 32 words |
+| 2 | H=14: 31; H=15–262: 32 words |
+| 3 | H=15: 29; H=16–259: 30; H=260–271: 31; H=272–515: 32 words |
+
+The next H above each maximum would require 33 words. Minimum H is the
+receive/dispatch/output work that must fit in the idle half-period. WAIT
+segments longer than 256 cycles consume another instruction word.
 
 ## Feasibility and design decisions
 
@@ -28,13 +65,13 @@ Incoming RX bits cannot reach the transmitted MSB before the byte finishes.
 | R2 | Total remaining bits, initialized to 8 or 16 | Zero |
 | R3 | Retained first RX byte after the byte boundary | First RX for two bytes; zero for one |
 
-No register-register OR/add is available. Appending a one uses `ADDI R0,1`
+No register-register OR/add is available in the legacy ISA. Appending a one uses `ADDI R0,1`
 after SHL clears bit zero; appending zero uses JMP. Both paths take the same
 time. Ordinary bits take a four-cycle pad that the longer byte-dispatch path
 skips, preserving uniform SCLK timing. This is control-flow balancing, not
 an unrolled waveform or payload-specific instruction sequence.
 
-The complete default allocation is 31 words: 4 for initial idle/direction
+The complete default Mode-0 allocation is 31 words: 4 for initial idle/direction
 and data/count setup; 3 for CS assertion and initial/loop balancing delays;
 14 for bit output, sampling and falling edge; 4 for bit counting and looping;
 3 for completion/idle; and 3 for retaining RX/loading the second byte/dispatch.
@@ -47,7 +84,7 @@ architectural change was needed or made.
 |---|---|---|
 | MOSI | `uio[7]` | Output |
 | MISO | `uio[0]` | Input |
-| SCLK | `uio[1]` | Output, idle LOW |
+| SCLK | `uio[1]` | Output, idle at CPOL |
 | CS | `uio[2]` | Output, active LOW |
 | Unused | `uio[6:3]` | Inputs |
 
@@ -57,22 +94,32 @@ pin allocation, not a restriction of the hardware. Other mappings/encoded
 shift directions are future generator experiments; this API does not promise
 arbitrary pin assignment. The generator never drives MISO.
 
-Mode 0 has idle-low clock, leading rising sample edges and trailing falling
-setup edges ([Microchip SPI transfer modes](https://onlinedocs.microchip.com/oxy/GUID-A299F4E7-F38C-4DF5-96C0-A87B9F519156-en-US-4/GUID-8A5B8750-B99E-4176-834E-E44E98F4A098.html)).
-Here the single-issue engine raises SCLK with OUT and executes READ on the
-**following system edge: 20 ns later at 50 MHz**. It cannot drive SCLK and
-read MISO in one instruction. A compatible slave must set MISO after CS
-assertion/falling SCLK and keep it stable throughout the high phase. This
-delayed high-phase capture is explicit, not a claim of edge-coincident sampling.
+The edge definitions follow [Microchip SPI transfer modes](https://onlinedocs.microchip.com/oxy/GUID-A299F4E7-F38C-4DF5-96C0-A87B9F519156-en-US-4/GUID-8A5B8750-B99E-4176-834E-E44E98F4A098.html).
+In every mode the single-issue engine produces the sample SCLK edge with OUT
+and executes READ on the **following system edge: 20 ns later at 50 MHz**.
+It cannot drive SCLK and read MISO in one instruction. The slave must present
+MISO before the sample edge and hold it through this additional system edge,
+including the final bit. A conventional slave holds until the next setup edge;
+the tests also exercise a slave that invalidates data immediately after the
+one-cycle hold. This is not a claim of edge-coincident sampling.
 The engine has no input synchronizer; device propagation, setup/hold, and
 board delays must satisfy the M2 synchronous input contract.
 
-MOSI can change during the low phase, including at falling SCLK, and remains
-stable across rising SCLK and throughout the high phase. Minimum MOSI setup
-is two system cycles at the fastest supported setting. Initial CS-to-first
-rising-edge time equals one configured half-period. CS deasserts six cycles
-after the last falling edge. The active direction persists in the final
-idle loop, with CS HIGH and SCLK/MOSI LOW. Reset or leaving RUN releases all
+For CPHA=0 (Modes 0/2), MOSI can change during the idle-clock phase, including
+at the trailing edge, and remains stable across the leading sample edge and
+throughout the active phase. Minimum MOSI setup is two system cycles. MISO's
+first bit is prepared after CS assertion, and later bits after trailing edges.
+For CPHA=1 (Modes 1/3), MOSI changes only on leading edges while selected,
+giving a full H-cycle setup before each trailing sample edge. The slave launches
+MISO on leading edges; both wires retain the last bit through its sample edge.
+
+In all modes, CS changes only with SCLK at CPOL and its first leading edge is
+H cycles after assertion. There are exactly 16 edges per byte, uniform across
+the byte boundary. CS deasserts six cycles after the last trailing edge for
+CPHA=0 and ten cycles after it for CPHA=1, after completing RX bookkeeping.
+CS-low duration is `16*n*H + (10 if CPHA else 6)` cycles for n bytes.
+The active direction persists in the final idle loop, with CS HIGH, SCLK at
+CPOL and MOSI LOW. Reset or leaving RUN releases all
 outputs; use an external CS pull-up if deselection is required while released.
 
 ## Logic, configuration and payload separation
@@ -83,16 +130,17 @@ symbolic labels, branch resolution, exact-cycle WAIT splitting and the
 32-word limit. It contains no protocol names, pin mappings, payload policy,
 or protocol timing. M3's UART image remains byte-for-byte unchanged.
 
-`generate_spi_master(payload, *, half_period_cycles=16)` in
+`generate_spi_master(payload, *, half_period_cycles=16, mode=0)` in
 `scripts/spi_firmware.py` owns the SPI state machine and its fixed pin mapping.
-`half_period_cycles` is configuration. `payload` is separate data; changing
+`mode` and `half_period_cycles` are configuration. `payload` is separate data; changing
 values in a two-byte payload changes only the two MOVI immediates, not the
 loop, instruction topology or timing. No payload bit causes generator-side
 waveform unrolling. The checked-in example sends `0xA5, 0x3C`.
 
-Runtime host loading was evaluated rather than assumed. The host can write
+Runtime host loading was evaluated for the original legacy firmware. The host can write
 only instruction bytes while RUN is zero; every stopped edge clears all
-registers. In RUN there is no host register-write port, FIFO or data RAM.
+registers. This legacy program does not use extended data RAM, and has no
+runtime host register-write port or FIFO.
 READ accesses GPIO, whose pins are already shared with the SPI peripheral.
 A framed streaming interface on spare GPIO would need its own handshake,
 packing and scheduling, with only one word free at the default setting.
@@ -105,8 +153,10 @@ it states the tested generator's scope and remaining resource budget.
 
 ```bash
 # Repository root; decimal and 0x hexadecimal payloads are accepted.
-python3 scripts/spi_firmware.py 0xA5 0x3C --output firmware/spi_master.hex
-python3 scripts/spi_firmware.py 0x37 146 --half-period 32 --output /tmp/spi.hex
+python3 scripts/spi_firmware.py 0xA5 0x3C --output /tmp/spi-mode0.hex
+python3 scripts/spi_firmware.py 0x37 146 --mode 1 --half-period 32 --output /tmp/spi-mode1.hex
+python3 scripts/spi_firmware.py 0xA5 0x3C --mode 2 --half-period 14
+python3 scripts/spi_firmware.py 0x81 --mode 3 --half-period 515
 python3 scripts/spi_firmware.py 255 --half-period 13
 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 bash scripts/test-local.sh TARGET=spi_firmware
@@ -131,7 +181,7 @@ leaving RUN, resetting or loading another transaction, which clears them.
 Completion is indicated externally by CS deassertion, not a hardware busy
 register or interrupt. A one-byte transfer returns only R0; R3 remains zero.
 
-## Instruction and cycle accounting
+## Mode-0 instruction and cycle accounting (unchanged)
 
 Default `H=16` program, addresses decimal:
 
@@ -167,12 +217,39 @@ inter-byte penalty. CS-low duration for n bytes is `16*n*H + 6` cycles,
 including the final six-cycle hold. At H=16 the two-byte interval is 512
 clocking cycles (10.24 us) plus six hold cycles (0.12 us).
 
-## Measured resource and timing results
+## Modes 1–3 instruction and cycle accounting
+
+Mode 2 uses the Mode-0 loop with an extra `ADDI R1,2` before its idle-phase
+MOSI OUT. The leading edge subtracts two from R1, and the trailing SET restores
+SCLK HIGH. Thus idle-phase work is 14 cycles before padding rather than 13;
+the active-phase budget remains six cycles plus `delay(H-6)`.
+
+For Modes 1/3, the leading OUT launches both MOSI and active SCLK. R1 retains
+that output pattern until the trailing OUT; it is then available for READ.
+SHL runs during the active phase, before the receive bit is inserted:
+
+- Active phase: SHL + delay(H-3) + ADDI clock transition + OUT = H cycles.
+- Idle phase: READ + ANDI + JNZ + (JMP or ADDI) = four receive cycles;
+  four count/boundary cycles; four balancing cycles; MOV + ANDI + OUT,
+  plus one ADDI for Mode 1. This totals 16 cycles for Mode 1, 15 for Mode 3,
+  with `delay(H-minimum)` supplying the remainder.
+- At a byte boundary, the four-cycle balance WAIT is replaced by the
+  second-byte JNZ + MOV R3,R0 + MOVI R0,tx1 + JMP. No edge or gap is added.
+- Initial delay(8) replaces the receive/count work before the first bit.
+- Final receive(4) + count(4) + completion JNZ + SET consumes ten cycles
+  after the final trailing edge, with no extra SCLK pulse.
+
+Mode 3 needs one fewer word because ANDI already produces its active LOW clock
+pattern. This leaves room for longer WAIT padding than Mode 1.
+
+## Mode-0 measured resource and timing results
 
 Icarus/cocotb pin observations at a 20 ns clock; frequencies are computed
 from observed periods. Each setting below exercised four full-duplex
 two-byte transactions, including unrelated TX/RX data and both branch paths.
-The test emits `test/output/spi-firmware-measurements.json`, retained by CI.
+The current test also exercises one single-byte transaction at each H and emits
+`test/output/spi-mode0-measurements.json`, retained by CI. Modes 1–3 emit
+corresponding files with their own tested boundaries.
 
 | H | Words / bytes | Program utilization | High / low cycles | Cycles/bit | SCLK at 50 MHz |
 |---|---|---|---|---|---|
@@ -210,53 +287,89 @@ The underlying RTL and its existing physical evidence are unchanged.
 
 ## Verification and reproduction
 
-`test/spi_reference.py` is an independent Mode-0 slave/monitor. It consumes
-only observed GPIO, OE and cycle numbers, loads reply MSB on CS assertion,
-advances reply bits on falling SCLK and decodes MOSI on rising SCLK. It
-imports no generator, opcode, firmware PC or register model. Tests also
-verify actual RX through the external register mux. No SPI hardware block
-or TX-to-MISO loopback substitutes for the slave's unrelated reply data.
+`test/spi_reference.py` implements `SpiSlave`, a mode-aware independent slave
+and monitor. It consumes only observed GPIO, OE, cycle numbers and the requested
+mode/timing. It imports no generator, opcode, firmware PC or register model.
+It launches MISO on the mode's setup edges and decodes MOSI on sample edges;
+CPHA=0 preloads the first reply on CS assertion. `Mode0Slave` remains a
+compatible wrapper for the existing runtime-loader test. RX is checked through
+the public register mux against replies unrelated to TX, with noise on unused
+inputs to test MISO masking.
 
-Six cocotb tests cover directed/random single bytes, 28 two-byte timing-sweep
-transactions, the checked-in image, successive transactions, reset/stop
-mid-transfer, reprogramming and pause behavior. They check every SCLK phase,
-first-bit setup, high-phase MOSI stability, CS boundaries/hold, unused output
-enables, idle retention and both stored RX values. Pausing explicitly stretches
-wall-clock timing; its test checks state retention then aborts the frame.
+Eight Cocotb tests run for each mode:
 
-Six firmware mutations must fail: a wrong TX bit, a one-cycle low-phase error,
-a cleared MISO mask, missing READ, premature CS, and bypassed RX branching.
-Unit tests exercise all 256 payload values, bit-loop topology independence,
-capacity boundaries, invalid CLI input, and unchanged UART hex reproduction.
-The payload sweep is generator coverage, not an exhaustive RTL sweep.
-Local verification passed all **33 RTL tests** (core 5, UART firmware 5,
-SPI firmware 6, legacy 2, fixed UART 3 at each of five divisors) and **22
-Python unit tests**. Independent review found an import compatibility
-regression in the shared-builder refactor; it was reproduced, fixed, and
-covered by subprocess tests for CLI, package import and file-based import
-from an unrelated directory. All regressions were rerun after that fix.
-A separate comparison confirmed all 512 single/complementary-pair UART
-images remain identical to M3 commit `bb5d79d`.
+1. Fourteen directed/random full-duplex single-byte transactions.
+2. Boundary/WAIT-transition timing sweeps, with one single-byte and four
+   two-byte transactions at each H.
+3. Example and successive transactions without reset (Mode 0 uses the
+   unchanged checked-in image).
+4. Reset/stop during a transaction, followed by reprogramming.
+5. Pause retains outputs/state, followed by abort and a fresh valid frame.
+6. Six corrupted firmware images must be rejected: wrong TX, wrong initial
+   WAIT, cleared MISO mask, missing READ, premature CS and bypassed RX branch.
+7. Minimum/maximum H with one/two bytes: MISO settles one cycle before the
+   sample edge and is valid only through the documented one-cycle post-sample
+   hold. A seventh mutation, capturing MISO prematurely without changing wire
+   timing, must fail specifically on RX data.
+8. Each of the other three modes' firmware must be rejected by this mode's
+   checker, proving CPOL/CPHA mismatches cannot silently pass.
+
+All valid transfers check both RX registers, exact edge counts and widths,
+MOSI setup/hold, uninterrupted CS across bytes, final CS hold, OE=0x86,
+idle pin retention and absence of engine faults. Pause/resume wire timing is
+not claimed: pausing stretches the frame, and the pause test aborts it.
+
+| Mode | H exercised in RTL | Passed / failed | Completed valid transactions |
+|---|---|---|---|
+| 0 | 13, 14, 16, 32, 262, 263, 269 | 8 / 0 | 59 |
+| 1 | 16, 17, 32, 259, 260, 271, 272 | 8 / 0 | 59 |
+| 2 | 14, 15, 16, 32, 261, 262 | 8 / 0 | 54 |
+| 3 | 15, 16, 32, 259, 260, 271, 272, 514, 515 | 8 / 0 | 69 |
+
+Each mode additionally rejects seven mutations and three wrong-mode images.
+These are **32 passing SPI RTL tests**, not 32 merely defined tests. Results
+were read from logs and checked XML with Icarus 12.0 / Cocotb 2.0.1 on
+2026-10-12. The separate per-mode runs list 24 filtered-out tests for the other
+modes as skipped; none of the eight selected tests was skipped. Compatibility
+regressions passed **22 core/loader**, **5 UART firmware**, **2 legacy RTL** and
+**39 Python tooling tests**. No physical-design flow was run.
+
+Python tests validate every integer H in each mode's range and reject adjacent
+out-of-range values. They cover all 256 payload values for loop independence.
+A frozen SHA-256 from the pre-change Mode-0 generator verifies exact output
+for all 257 H settings with one/two bytes and all 256 payload values at H=16.
+This is generator coverage, not an exhaustive RTL sweep of every payload/H.
+
+Reproduction with installed Icarus, make, and Python containing
+`test/requirements.txt` (Cocotb 2.0.1 and pytest 8.4.2):
 
 ```bash
-set -e
-python3 -m unittest discover -s scripts -p 'test_*.py' -v
-for target in core uart_firmware spi_firmware legacy; do
-  bash scripts/test-local.sh TARGET="$target"
-  python3 scripts/check-test-results.py test/results.xml
-done
-for divisor in 1 2 4 17 434; do
-  bash scripts/test-local.sh TARGET=uart UART_CLKS_PER_BIT="$divisor"
-  python3 scripts/check-test-results.py test/results.xml
-done
+# WSL working directory; activate an existing environment or install the
+# requirements into a virtual environment first.
+cd /mnt/d/CS4444/FoRG-protocol-emulator
+export PATH=/tmp/forg-regression/venv/bin:/usr/bin:/bin
+bash scripts/test-spi-modes.sh mode0
+bash scripts/test-spi-modes.sh mode1
+bash scripts/test-spi-modes.sh mode2
+bash scripts/test-spi-modes.sh mode3
+bash scripts/test-spi-modes.sh compat
 ```
 
-CI preserves all existing runs and adds SPI with immediate XML validation,
-`results-spi-firmware.xml`, `spi_firmware.fst` and the measurement JSON.
-Local SPI simulation produces `test/tb.fst`; copy it before another target
-overwrites it. With installed dependencies, `cd test && make -B TARGET=spi_firmware`
-is equivalent to the launcher. Gate/board-level SPI validation is not part
-of the reported RTL results.
+Each invocation snapshots the current working files into a new
+`/tmp/forg-spi-modes.XXXXXX` directory and prints its path. No original results,
+sources, or frozen `wire300-v2` artifacts are overwritten. The directory retains
+source hashes, base commit, named logs/XML, FSTs, and `test/output/` measurement
+JSON. Mode runs take about 5–15 seconds each locally; compatibility about
+15 seconds. Success requires exit zero and eight selected passes per mode,
+plus the compatibility counts above with no failures/errors. XML can be
+rechecked with `python scripts/check-test-results.py /tmp/forg-spi-modes.XXXXXX/mode0.xml`.
+The optional `all` selection runs these same focused checks sequentially.
+
+CI's existing `make -B TARGET=spi_firmware` runs all 32 SPI tests without a
+mode filter, retaining `results-spi-firmware.xml`, `spi_firmware.fst` and the
+measurement JSON. Direct make commands use `test/results.xml` and `test/tb.fst`;
+use the isolated script to preserve existing outputs. Gate/board-level SPI
+validation is not part of these RTL results.
 
 ## General-purpose improvements to evaluate later
 
@@ -280,6 +393,9 @@ of the reported RTL results.
   optimization. The one-word default margin and four occupied registers are
   measurements that motivate experiments, not permission to redesign the ISA.
 
-Not provided: modes 1–3, arbitrary pin remapping, indefinite streaming, more
+Not provided: arbitrary pin remapping, indefinite streaming, more
 than two retained RX bytes, or autonomous repeated transactions without host
 loading. None is silently emulated with precomputed waveform tables.
+
+With all four SPI modes independently verified at RTL, the next development
+target is **I2C 400 kHz**.

@@ -41,13 +41,24 @@ def transaction_data(address, *, write=(), read_count=0):
     return ram
 
 
-def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
-    """Protocol loops, independent of address/payload. 50 MHz Standard-mode.
+def generate_i2c_master(*, half_period_cycles=None, stretch_polls=255, mode='standard'):
+    """Protocol loops, independent of address/payload, for a 50 MHz clock.
 
     The configured half-period is a minimum software delay; instruction overhead
     and physical edges reduce actual frequency. Stretch timeout is bounded by
     stretch_polls unsuccessful samples, separated by a 256-cycle WAIT.
+    Standard mode preserves the original image (default half-period 250).
+    Fast mode uses fixed LOW/HIGH delays of 60/25 cycles and supports digital
+    threshold delays through 300 ns independently on each bus edge. It does not
+    accept half_period_cycles: changing a single delay is not a timing profile.
     """
+    if mode not in ('standard', 'fast'):
+        raise ValueError('mode must be standard or fast')
+    fast = mode == 'fast'
+    if fast and half_period_cycles is not None:
+        raise ValueError('half_period_cycles is only configurable in Standard mode')
+    if half_period_cycles is None:
+        half_period_cycles = 250
     if type(half_period_cycles) is not int or not 250 <= half_period_cycles <= 4096:
         raise ValueError('half_period_cycles must be an integer in 250..4096')
     if type(stretch_polls) is not int or not 1 <= stretch_polls <= 255:
@@ -70,7 +81,7 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     branch('JNZ', 'invalid', rd=1)
     # Check idle, delay bus-free time, then check again. Single-controller bus.
     call('idle_check')
-    wait(300)
+    wait(65 if fast else 300)
     call('idle_check')
     e('LDA', rd=2, imm=WRITE_LENGTH)
     branch('JZ', 'read_only', rd=2)
@@ -112,7 +123,7 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     e('OESET', imm=1)
     call('clock_high')
     e('OECLR', imm=1)
-    wait(256)                           # Allow maximum tested passive SDA rise
+    wait(16 if fast else 256)            # Allow maximum tested passive SDA rise
     e('READ', rd=1)
     e('ANDI', rd=1, imm=1)
     branch('JNZ', 'abort', rd=1)
@@ -139,8 +150,11 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     e('RET')
     label('start')
     e('OESET', imm=1)
-    wait(250)
-    e('RET')
+    wait(45 if fast else 250)
+    if fast:
+        branch('JMP', 'fall')            # Tail call: first TX bit already has SCL LOW
+    else:
+        e('RET')
     label('fall')
     e('OESET', imm=2)
     wait(16)
@@ -148,7 +162,8 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     label('tx_byte')
     e('MOVI', rd=3, imm=8)
     label('tx_bit')
-    call('fall')
+    if not fast:
+        call('fall')
     e('MOV', rd=1, rs=0)
     e('ANDI', rd=1, imm=128)
     branch('JNZ', 'tx_one', rd=1)
@@ -159,8 +174,11 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     label('tx_clock')
     call('clock_high')
     e('SHL', rd=0)
+    if fast:
+        call('fall')                    # Exactly one guard, including byte boundaries
     branch('DJNZ', 'tx_bit', rd=3)
-    call('fall')
+    if not fast:
+        call('fall')
     e('OECLR', imm=1)                   # Target owns the ninth bit
     call('clock_high')
     e('READ', rd=1)
@@ -186,10 +204,12 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     e('OECLR', imm=1)
     e('RET')
     label('clock_high')
-    wait(half_period_cycles)
+    wait(60 if fast else half_period_cycles)
     e('OECLR', imm=2)
     e('STA', rd=3, imm=SAVED_BITS)
     e('MOVI', rd=3, imm=stretch_polls)
+    if fast:
+        wait(13)                        # First READ 16 cycles after SCL release
     label('stretch')
     e('READ', rd=1)
     e('ANDI', rd=1, imm=2)
@@ -200,14 +220,15 @@ def generate_i2c_master(*, half_period_cycles=250, stretch_polls=255):
     branch('JMP', 'abort')
     label('clock_ready')
     e('LDA', rd=3, imm=SAVED_BITS)
-    wait(half_period_cycles)
+    wait(25 if fast else half_period_cycles)
     e('RET')
     return p.assemble()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--half-period', type=int, default=250)
+    parser.add_argument('--mode', choices=('standard', 'fast'), default='standard')
+    parser.add_argument('--half-period', type=int, help='Standard-only delay, default 250 cycles')
     parser.add_argument('--stretch-polls', type=int, default=255)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--address', type=lambda v:int(v,0))
@@ -216,7 +237,7 @@ def main():
     parser.add_argument('--data-output', type=Path)
     args = parser.parse_args()
     try:
-        words = generate_i2c_master(half_period_cycles=args.half_period, stretch_polls=args.stretch_polls)
+        words = generate_i2c_master(half_period_cycles=args.half_period, stretch_polls=args.stretch_polls, mode=args.mode)
         data = transaction_data(args.address, write=args.write, read_count=args.read_count) if args.address is not None else None
         if args.data_output and data is None:
             raise ValueError('--data-output requires --address')

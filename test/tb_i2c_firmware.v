@@ -5,6 +5,12 @@
 `ifndef I2C_RISE_NS
 `define I2C_RISE_NS 0
 `endif
+`ifndef I2C_SDA_RISE_NS
+`define I2C_SDA_RISE_NS `I2C_RISE_NS
+`endif
+`ifndef I2C_SCL_RISE_NS
+`define I2C_SCL_RISE_NS `I2C_RISE_NS
+`endif
 `ifndef I2C_SCL_FALL_NS
 `define I2C_SCL_FALL_NS 0
 `endif
@@ -22,8 +28,8 @@ module tb_i2c_firmware;
   assign raw_scl = uio_oe[1] ? uio_out[1] : 1'bz;
   assign raw_sda = slave_sda_low ? 1'b0 : 1'bz;
   assign raw_scl = slave_scl_low ? 1'b0 : 1'bz;
-  assign #(`I2C_RISE_NS, `I2C_SDA_FALL_NS) sda = raw_sda;
-  assign #(`I2C_RISE_NS, `I2C_SCL_FALL_NS) scl = raw_scl;
+  assign #(`I2C_SDA_RISE_NS, `I2C_SDA_FALL_NS) sda = raw_sda;
+  assign #(`I2C_SCL_RISE_NS, `I2C_SCL_FALL_NS) scl = raw_scl;
   // Models external host/bus isolation during programming; M2 has no such mux.
 `ifdef I2C_UI_HOST
   // Full master uses UI-only host packets, with the physical bus always attached.

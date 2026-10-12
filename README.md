@@ -8,13 +8,14 @@ An experimental programmable I/O engine for the Jane Street Protocol Emulator AS
 | uart_firmware | M2 core plus isolated testbench reference | M3: firmware 8N1 TX, compared cycle-by-cycle with M1 |
 | i2c_firmware | protocol_engine.v, protocol_top.v | Address-write probe, ACK/NACK and clock stretching; isolated host programming and bus-idle qualification required |
 | i2c_master | protocol_engine.v, protocol_top.v | Runtime-configured multi-byte write/read, repeated START, ACK/NACK and bounded clock stretching |
-| spi_firmware | protocol_engine.v, protocol_top.v | Full-duplex Mode-0 SPI firmware and independent pin-level slave model |
+| spi_firmware | protocol_engine.v, protocol_top.v | Full-duplex SPI Modes 0–3 firmware and independent pin-level slave model |
 | uart | uart_tx.v, uart_baseline.v | M1: dedicated 8N1 UART transmitter and independent area/timing baseline |
 | legacy | project.v | Original 8-byte SET/WAIT/JMP engine and its regression |
 
 M3 firmware transmits one or two UART bytes at 434 cycles/bit. SPI firmware
-exchanges one or two bytes with configurable clock timing. Both retain their
-original M2 instruction images and run in the core's compatible legacy mode.
+exchanges one or two bytes in Modes 0–3 with configurable clock timing. UART
+and SPI Mode 0 retain their original M2 instruction images; all SPI modes run
+within the core's compatible 32-word legacy mode. See [SPI timing and tests](docs/spi-firmware.md).
 Complete I2C firmware uses the extended general-purpose ISA to write and read
 up to 15 bytes each, including repeated-START register reads. Address and payload
 are loaded into data RAM through UI pins while SDA/SCL remain connected.

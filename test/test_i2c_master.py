@@ -5,16 +5,37 @@ from pathlib import Path
 import sys
 
 import cocotb
-from cocotb.triggers import Timer
-from i2c_master_reference import I2CMemorySlave
+from cocotb.triggers import Timer, Edge, First
+from cocotb.utils import get_sim_time
+from i2c_master_reference import I2CMemorySlave as ReferenceSlave
+from i2c_fast_timing import FastTiming
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from i2c_master import generate_i2c_master, transaction_data
+from i2c_master import generate_i2c_master as generate, transaction_data
 from pio_host import program_writes, data_writes
 
 DELAYS = tuple(int(os.environ.get(name, 0)) for name in
-               ('I2C_RISE_NS', 'I2C_SCL_FALL_NS', 'I2C_SDA_FALL_NS'))
+               ('I2C_SCL_RISE_NS', 'I2C_SCL_FALL_NS', 'I2C_SDA_RISE_NS', 'I2C_SDA_FALL_NS'))
+MODE = os.environ.get('I2C_MODE', 'standard')
+
+
+def generate_i2c_master(**kwargs):
+    return generate(mode=MODE, **kwargs)
+
+
+def I2CMemorySlave(*args, **kwargs):
+    return ReferenceSlave(*args, mode=MODE, **kwargs)
+
+
+async def watch_bus(dut, monitor, errors):
+    try:
+        while True:
+            await First(Edge(dut.sda), Edge(dut.scl))
+            await Timer(1, unit='ps')  # Settle simultaneous resolved-net updates.
+            monitor.observe(float(get_sim_time(unit='ns')), int(dut.sda.value), int(dut.scl.value))
+    except AssertionError as error:
+        errors.append(error)
 
 
 async def tick(dut):
@@ -94,7 +115,21 @@ async def sample(dut, slave, cycle, trace=None):
     assert int(dut.uo_out.value) & 0x80 == 0, 'PIO execution fault'
 
 
-async def run(dut, slave, *, limit=250000, pause=False, trace=None, busy_stop_phase=None):
+async def run(dut, slave, **kwargs):
+    errors = []
+    monitor = FastTiming(float(get_sim_time(unit='ns'))) if MODE == 'fast' else None
+    task = cocotb.start_soon(watch_bus(dut, monitor, errors)) if monitor else None
+    try:
+        return await run_transaction(dut, slave, **kwargs)
+    finally:
+        if task:
+            task.cancel()
+            slave.timing = monitor.summary()
+        if errors:
+            raise errors[0]
+
+
+async def run_transaction(dut, slave, *, limit=250000, pause=False, trace=None, busy_stop_phase=None):
     dut.ui_in.value = 0xa0
     paused = False
     resume = None
@@ -215,22 +250,29 @@ async def test_address_data_and_read_address_nacks(dut):
 async def test_timing_stretch_all_phases_and_pause(dut):
     await reset(dut)
     measurements = []
-    for period in (250, 267):
+    for period in ((None,) if MODE == 'fast' else (250, 267)):
         await load_program(dut, generate_i2c_master(half_period_cycles=period))
         slave = await transact(dut, 0x55, b'\x20\x00\xff', 3)
         measurements.append(dict(period=period, low_cycles=slave.low_cycles,
                                  high_cycles=slave.high_cycles,
                                  rising_edges=slave.rising_edges,
-                                 starts=slave.starts, stops=slave.stops))
+                                 starts=slave.starts, stops=slave.stops,
+                                 exact_ns=getattr(slave, 'timing', None)))
     await load_program(dut)
     for payload, count in ((b'\x30\x96', 0), (b'', 2), (b'\x30', 2)):
         slave = await transact(dut, 0x6a, payload, count,
                                slave=I2CMemorySlave(0x6a, stretch_all=900))
         assert all(low >= 900 for low in slave.low_cycles), 'Some low phase ignored clock stretching'
-    await transact(dut, 0x4b, b'\x30\x96', 2, pause=True)
-    await transact(dut, 0x50, b'\x20', slave=I2CMemorySlave(0x50, stretches={19: 2000}),
-                   busy_stop_phase=19)
-    path = ROOT / 'test/output' / ('i2c-master-' + '-'.join(map(str, DELAYS)) + '.json')
+        if MODE == 'fast':
+            measurements.append(dict(workload='stretch_all', exact_ns=slave.timing))
+    slave = await transact(dut, 0x4b, b'\x30\x96', 2, pause=True)
+    if MODE == 'fast':
+        measurements.append(dict(workload='pause', exact_ns=slave.timing))
+    slave = await transact(dut, 0x50, b'\x20', slave=I2CMemorySlave(0x50, stretches={19: 2000}),
+                           busy_stop_phase=19)
+    if MODE == 'fast':
+        measurements.append(dict(workload='stretch_stop', exact_ns=slave.timing))
+    path = ROOT / 'test/output' / ('i2c-master-' + MODE + '-' + '-'.join(map(str, DELAYS)) + '.json')
     path.parent.mkdir(exist_ok=True)
     path.write_text(json.dumps(measurements, indent=2) + '\n')
 
@@ -351,7 +393,7 @@ async def test_real_firmware_mutations_are_rejected(dut):
     words = baseline.copy()
     words[words.index(0xfc00)] = 0xfc01  # Assemble received bits from SCL instead of SDA.
     cases.append(('received RAM data', words, b'', 2, {}))
-    words = [0x1000 if word == 0x10f9 else word for word in baseline]
+    words = [0x1000 if word == (0x103b if MODE == 'fast' else 0x10f9) else word for word in baseline]
     cases.append(('required timing waits', words, b'\x10', 0, {}))
     words = baseline.copy()
     master_ack = max(index for index, word in enumerate(words) if word == 0xe401)
@@ -378,3 +420,111 @@ async def test_real_firmware_mutations_are_rejected(dut):
             dut._log.info('Independent target rejected firmware %s mutation: %s', name, error)
         else:
             raise AssertionError(f'Firmware {name} mutation escaped verification')
+
+
+@cocotb.test(skip=MODE != 'fast')
+async def test_fast_all_lengths_and_byte_boundaries(dut):
+    await reset(dut)
+    await load_program(dut)
+    measurements = []
+    # Every supported count, simultaneous maximum write/read, adversarial bit
+    # transitions after ACK, independent non-palindromic RX bytes, RAM-only jobs.
+    for count in range(1, 16):
+        payload = bytes(([0xff, 0x00, 0x81, 0x7e, 0xa5, 0x5a] * 3)[:count])
+        slave = I2CMemorySlave(0x55, data_delay_cycles=29,
+                               memory=bytes((i * 37 + 91) & 255 for i in range(256)))
+        await transact(dut, 0x55, payload, count, slave=slave)
+        assert max(slave.low_cycles) < 120, 'Unstretched bus paid an extra polling interval'
+        measurements.append(dict(count=count, delays_ns=DELAYS, exact_ns=slave.timing))
+    path = ROOT / 'test/output/fast-boundaries.json'
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(json.dumps(measurements, indent=2) + '\n')
+
+
+@cocotb.test(skip=MODE != 'fast')
+async def test_fast_all_lengths_pure_write_and_read(dut):
+    await reset(dut)
+    await load_program(dut)
+    for count in range(1, 16):
+        payload = bytes((i * 73 + 0x81) & 255 for i in range(count))
+        await transact(dut, 0x39, payload)
+        slave = I2CMemorySlave(0x39, pointer=0xf9,
+                               memory=bytes((i * 19 + 0x53) & 255 for i in range(256)))
+        await transact(dut, 0x39, read_count=count, slave=slave)
+
+
+@cocotb.test(skip=MODE != 'fast')
+async def test_fast_poll_timeout_budget(dut):
+    for polls in (1, 2, 255):
+        await reset(dut)
+        await load_program(dut, generate_i2c_master(stretch_polls=polls))
+        # One poll must suffice for an unstretched bus, even with 300 ns rise.
+        await transact(dut, 0x50, b'\xff', 1)
+        await configure(dut, transaction_data(0x50, write=b'\x20'))
+        slave = I2CMemorySlave(0x50, stretches={1: 200000})
+        dut.ui_in.value = 0xa0
+        release = None
+        previously_low = False
+        for cycle in range(70000):
+            await sample(dut, slave, cycle)
+            low = bool(int(dut.uio_oe.value) & 2)
+            if previously_low and not low and release is None:
+                release = cycle
+            previously_low = low
+            if int(dut.uo_out.value) & 0x40:
+                break
+        assert release is not None
+        assert cycle - release == 16 + (polls - 1) * 260 + 263, 'Timeout sample budget changed'
+        assert await ram(dut, 19) == 6 and not slave.complete
+        assert int(dut.uio_oe.value) == 0
+
+
+@cocotb.test(skip=MODE != 'fast')
+async def test_fast_timing_oracle_rejects_late_valid_and_boundary_mutations(dut):
+    # Synthetic resolved-edge traces exercise each limit independently. This
+    # oracle imports no firmware. Functional and real-firmware mutation tests
+    # above separately verify it against executing RTL.
+    def replay(rows):
+        monitor = FastTiming()
+        for row in rows:
+            monitor.observe(*row)
+        return monitor
+    good = [(2000, 0, 1), (2700, 0, 0), (3100, 1, 0),
+            (4200, 1, 1), (5300, 1, 0), (5700, 0, 0),
+            (6800, 0, 1), (7500, 1, 1)]
+    replay(good)
+    cases = {
+        'bus free': [(1000, 0, 1)] + good[1:],
+        'start hold': [good[0], (2500, 0, 0)] + good[2:],
+        'low': good[:3] + [(3900, 1, 1)] + good[4:],
+        'high': good[:4] + [(4700, 1, 0)] + good[5:],
+        'setup': good[:2] + [(4150, 1, 0)] + good[3:],
+        'data validity': good[:2] + [(3700, 1, 0)] + good[3:],
+        'stop setup': good[:-1] + [(7300, 1, 1)],
+        'repeated start': good[:4] + [(4700, 0, 1)],
+        'hold': good[:1] + [(2700, 1, 0)] + good[3:],
+    }
+    for name, rows in cases.items():
+        try:
+            replay(rows)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError(f'Timing oracle missed {name}')
+    # Late ACK and first data bit after ACK must both be bounded, even when
+    # the sampled byte would be correct and all setup/LOW/HIGH limits pass.
+    for bad_bit, expected in ((8, 'ack_valid_ns'), (9, 'data_valid_ns')):
+        rows = [(2000, 0, 1)]
+        sda = 0
+        for bit in range(11):
+            fall = 2700 + bit * 3000
+            rows.append((fall, sda, 0))
+            sda ^= 1
+            rows.append((fall + (1000 if bit == bad_bit else 400), sda, 0))
+            rows.append((fall + 1800, sda, 1))
+        try:
+            replay(rows)
+        except AssertionError as error:
+            assert expected in str(error)
+        else:
+            raise AssertionError('Late ACK/byte boundary escaped validity checker')

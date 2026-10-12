@@ -10,7 +10,12 @@ bytes write and increment it; reads return and increment the current register.
 class I2CMemorySlave:
     def __init__(self, address, *, memory=None, pointer=0, acknowledge=True,
                  acknowledge_read=True, nack_data=None, stretches=None,
-                 stretch_all=0, hold_sda_after_ack=False):
+                 stretch_all=0, hold_sda_after_ack=False, mode='standard', data_delay_cycles=20):
+        assert mode in ('standard', 'fast')
+        self.mode = mode
+        self.data_delay_cycles = data_delay_cycles
+        self.min_low, self.min_high, self.min_setup, self.min_period = (
+            (65, 30, 5, 125) if mode == 'fast' else (235, 200, 13, 500))
         self.address = address
         self.memory = bytearray(range(256)) if memory is None else bytearray(memory)
         assert len(self.memory) == 256
@@ -49,8 +54,8 @@ class I2CMemorySlave:
         return bool(self.stops)
 
     def _drive(self, cycle, low):
-        # Target changes data 400 ns after an observed falling edge.
-        self._sda_event = (cycle + 20, bool(low))
+        # Independent target response delay after an observed falling edge.
+        self._sda_event = (cycle + self.data_delay_cycles, bool(low))
 
     def _receive_byte(self):
         value = 0
@@ -95,7 +100,7 @@ class I2CMemorySlave:
                 if not sda:
                     if self._active:
                         assert self._state in ('rx', 'wait') and len(self._bits) <= 1, 'Repeated START interrupted a byte'
-                        assert self.rising_edges and cycle - self.rising_edges[-1] >= 235, 'Repeated START setup shorter than 4.7 us'
+                        assert self.rising_edges and cycle - self.rising_edges[-1] >= (30 if self.mode == 'fast' else 235), 'Repeated START setup violated'
                     self.starts.append(cycle)
                     self.last_start = cycle
                     self._first_fall = True
@@ -106,7 +111,7 @@ class I2CMemorySlave:
                 else:
                     assert self._active and self._segment is not None, 'Unexpected STOP'
                     assert self._state in ('rx', 'wait') and len(self._bits) <= 1, 'STOP interrupted a byte'
-                    assert cycle - self.rising_edges[-1] >= 200, 'STOP setup shorter than 4 us'
+                    assert cycle - self.rising_edges[-1] >= self.min_high, 'STOP setup violated'
                     self.stops.append(cycle)
                     self._active = False
                     self._state = 'idle'
@@ -118,11 +123,11 @@ class I2CMemorySlave:
         if self._active:
             if old_scl and not scl:
                 if self._first_fall:
-                    assert cycle - self.last_start >= 200, 'START hold shorter than 4 us'
+                    assert cycle - self.last_start >= self.min_high, 'START hold violated'
                     self._first_fall = False
                 else:
                     high = cycle - self.rising_edges[-1]
-                    assert high >= 200, 'SCL HIGH shorter than 4 us'
+                    assert high >= self.min_high, 'SCL HIGH violated'
                     self.high_cycles.append(high)
                 self.falling_edges.append(cycle)
                 duration = self.stretches.get(len(self.falling_edges), self.stretch_all)
@@ -157,10 +162,10 @@ class I2CMemorySlave:
             elif not old_scl and scl:
                 assert self.falling_edges, 'SCL rose before START hold'
                 low = cycle - self.falling_edges[-1]
-                assert low >= 235, 'SCL LOW shorter than 4.7 us'
-                assert cycle - self.last_sda_change >= 13, 'SDA setup shorter than 250 ns'
+                assert low >= self.min_low, 'SCL LOW violated'
+                assert cycle - self.last_sda_change >= self.min_setup, 'SDA setup violated'
                 if self.rising_edges:
-                    assert cycle - self.rising_edges[-1] >= 500, 'SCL exceeds 100 kHz'
+                    assert cycle - self.rising_edges[-1] >= self.min_period, 'SCL frequency exceeded'
                 self.low_cycles.append(low)
                 self.rising_edges.append(cycle)
                 if self._state == 'rx':

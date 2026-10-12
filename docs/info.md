@@ -4,7 +4,7 @@ A minimal programmable I/O engine with 128 16-bit instructions (32-word legacy m
 
 M3 UART TX firmware sends one or two 8N1 bytes at 434 cycles per bit on uio[0],
 using the unchanged M2 core. See docs/uart-firmware.md for loading and timing.
-SPI Mode-0 firmware also exchanges one or two bytes full duplex, with
+SPI Modes 0–3 firmware also exchanges one or two bytes full duplex, with
 configurable clock timing; see docs/spi-firmware.md for pin mapping and the
 one-system-cycle MISO capture offset. RAM-configured I2C master firmware is
 documented in docs/i2c-master.md.
