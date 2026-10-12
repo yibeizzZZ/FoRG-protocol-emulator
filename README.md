@@ -61,6 +61,7 @@ Gate simulation uses the matching PDK revision and a zero-delay functional model
 - [ISA and host interface](docs/isa.md)
 - [Fixed UART contract and tests](docs/uart-baseline.md)
 - [Firmware UART, timing and measurements](docs/uart-firmware.md)
+- [Firmware UART RX, RAM captures and timing limits](docs/uart-rx.md)
 - [Full-duplex SPI firmware and architecture evaluation](docs/spi-firmware.md)
 - [I2C address probe, host preconditions and architecture limits](docs/i2c-firmware.md)
 - [Complete I2C master, runtime data and host integration](docs/i2c-master.md)
