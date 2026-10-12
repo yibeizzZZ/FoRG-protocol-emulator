@@ -1,5 +1,9 @@
 # Program Loader verification — 2026-10-11
 
+For the subsequent unchanged-RTL place-and-route run and extracted timing,
+see [physical validation results (2026-10-12)](program-loader-physical-results.md).
+The pre-route results below remain the historical synthesis checkpoint.
+
 Branch: `feat/runtime-program-loader`, based on I2C-capable revision `7b62a02`.
 The implementation adds 19 state bits for managed/committed/error and two
 8-bit counters. Program/data capacity and the execution datapath are unchanged.
